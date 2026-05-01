@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "bigquery-basics": {
+      "source": "google/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloud/bigquery-basics/SKILL.md",
+      "computedHash": "9cfab3ca57c3f91b8443fdad64434eb041d8ec07626e12db5712eac3df404ace"
+    },
+    "cloud-run-basics": {
+      "source": "google/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloud/cloud-run-basics/SKILL.md",
+      "computedHash": "2f26c96218b69f42d307ebbfd46f2c5c27055a82e5990b8eb5fe4931343d6cc5"
+    },
+    "firebase-basics": {
+      "source": "google/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloud/firebase-basics/SKILL.md",
+      "computedHash": "e16b8043c969652325e70c1e072b72be32394aacf9fad1ab1b158659a638d12a"
+    },
+    "gemini-api": {
+      "source": "google/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloud/gemini-api/SKILL.md",
+      "computedHash": "7e22493b7e3393b0aa46634c8ba0a861c56d85bb158f48551ddc1feda3d53c8b"
+    }
+  }
+}
