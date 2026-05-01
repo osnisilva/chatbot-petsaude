@@ -95,15 +95,58 @@ client.on('message', async (message) => {
             console.log(`Paciente ${patient.name} encontrado. Consultando IA Gemini...`);
             
             try {
+                // 1. Busca ou cria sessão ativa
+                let { data: session } = await supabase
+                    .from('chat_sessions')
+                    .select('*')
+                    .eq('patient_id', patient.id)
+                    .eq('status', 'active')
+                    .maybeSingle();
+
+                if (!session) {
+                    const { data: newSession, error } = await supabase
+                        .from('chat_sessions')
+                        .insert({ patient_id: patient.id, status: 'active' })
+                        .select()
+                        .single();
+                    if (error) throw error;
+                    session = newSession;
+                }
+
+                // 2. Grava a mensagem do paciente no banco
+                await supabase.from('messages').insert({
+                    session_id: session.id,
+                    sender_type: 'patient',
+                    content: messageText
+                });
+
+                // 3. Busca o histórico dos últimos 60 dias
+                const sixtyDaysAgo = new Date();
+                sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+                const { data: history } = await supabase
+                    .from('messages')
+                    .select('sender_type, content')
+                    .eq('session_id', session.id)
+                    .gte('created_at', sixtyDaysAgo.toISOString())
+                    .order('created_at', { ascending: true });
+
+                // Formata para o Gemini (apenas 'user' ou 'model')
+                const chatHistory = history.map(msg => ({
+                    role: msg.sender_type === 'patient' ? 'user' : 'model',
+                    parts: [{ text: msg.content }]
+                }));
+
                 // Prompt de sistema para instruir o Gemini
                 const systemInstruction = `Você é um assistente virtual gentil e prestativo para Agentes Comunitários de Saúde (ACS). 
 Você está conversando com o paciente: ${patient.name}. 
 Seja muito educado, use linguagem acessível e curta. 
 Se for perguntado sobre dados médicos, diga que você ainda está em fase de treinamento e só pode agendar visitas do ACS.`;
 
+                // 4. Envia o histórico completo para a IA
                 const response = await ai.models.generateContent({
                     model: 'gemini-1.5-flash',
-                    contents: messageText,
+                    contents: chatHistory,
                     config: {
                         systemInstruction: systemInstruction,
                         temperature: 0.7
@@ -111,8 +154,16 @@ Se for perguntado sobre dados médicos, diga que você ainda está em fase de tr
                 });
                 
                 replyText = response.text || "Desculpe, não consegui processar sua mensagem agora.";
+
+                // 5. Grava a resposta da IA no banco
+                await supabase.from('messages').insert({
+                    session_id: session.id,
+                    sender_type: 'bot',
+                    content: replyText
+                });
+
             } catch (aiError) {
-                console.error("Erro no Gemini:", aiError);
+                console.error("Erro na lógica de IA/Banco:", aiError);
                 replyText = `Olá, ${patient.name}! Recebi sua mensagem, mas nosso cérebro artificial está temporariamente fora do ar.`;
             }
         }
