@@ -92,79 +92,102 @@ client.on('message', async (message) => {
             // Resposta de "primeiro acesso"
             replyText = `Olá! Bem-vindo ao atendimento da Secretaria de Saúde. Percebemos que é o seu primeiro acesso conosco. Aguarde um instante enquanto sincronizamos seus dados.`;
         } else {
-            console.log(`Paciente ${patient.name} encontrado. Consultando IA Gemini...`);
-            
-            try {
-                // 1. Busca ou cria sessão ativa
-                let { data: session } = await supabase
-                    .from('chat_sessions')
-                    .select('*')
-                    .eq('patient_id', patient.id)
-                    .eq('status', 'active')
-                    .maybeSingle();
+            // Verificação de Consentimento LGPD
+            const userMsgUpper = messageText.trim().toUpperCase();
 
-                if (!session) {
-                    const { data: newSession, error } = await supabase
-                        .from('chat_sessions')
-                        .insert({ patient_id: patient.id, status: 'active' })
-                        .select()
-                        .single();
-                    if (error) throw error;
-                    session = newSession;
+            if (patient.lgpd_consent === null) {
+                if (userMsgUpper === 'ACEITO') {
+                    await supabase.from('patients').update({ lgpd_consent: true }).eq('id', patient.id);
+                    replyText = `✅ *Termo Aceito!*\nObrigado, ${patient.name}. Como posso ajudar você hoje com a Secretaria de Saúde?`;
+                } else if (userMsgUpper === 'RECUSO') {
+                    await supabase.from('patients').update({ lgpd_consent: false }).eq('id', patient.id);
+                    replyText = `❌ *Termo Recusado*\nEntendemos sua decisão. O atendimento automatizado por este canal foi desativado. Para reativar no futuro, digite *ACEITO*.`;
+                } else {
+                    replyText = `Olá, ${patient.name}! Para seguirmos com seu atendimento pelo WhatsApp da Secretaria de Saúde e garantirmos sua privacidade de acordo com a LGPD, precisamos da sua autorização.\n\nResponda *ACEITO* para autorizar as mensagens ou *RECUSO* para não utilizar este canal.`;
                 }
+            } else if (patient.lgpd_consent === false) {
+                if (userMsgUpper === 'ACEITO') {
+                    await supabase.from('patients').update({ lgpd_consent: true }).eq('id', patient.id);
+                    replyText = `✅ *Termo Aceito!*\nObrigado por reativar o canal, ${patient.name}. Como posso ajudar?`;
+                } else {
+                    replyText = `Você optou por não utilizar o atendimento automatizado. Caso mude de ideia e queira ser atendido, digite *ACEITO*.`;
+                }
+            } else {
+                // Fluxo normal da IA para pacientes que já deram consentimento (lgpd_consent === true)
+                console.log(`Paciente ${patient.name} encontrado e validado. Consultando IA Gemini...`);
+                
+                try {
+                    // 1. Busca ou cria sessão ativa
+                    let { data: session } = await supabase
+                        .from('chat_sessions')
+                        .select('*')
+                        .eq('patient_id', patient.id)
+                        .eq('status', 'active')
+                        .maybeSingle();
 
-                // 2. Grava a mensagem do paciente no banco
-                await supabase.from('messages').insert({
-                    session_id: session.id,
-                    sender_type: 'patient',
-                    content: messageText
-                });
+                    if (!session) {
+                        const { data: newSession, error } = await supabase
+                            .from('chat_sessions')
+                            .insert({ patient_id: patient.id, status: 'active' })
+                            .select()
+                            .single();
+                        if (error) throw error;
+                        session = newSession;
+                    }
 
-                // 3. Busca o histórico dos últimos 60 dias
-                const sixtyDaysAgo = new Date();
-                sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+                    // 2. Grava a mensagem do paciente no banco
+                    await supabase.from('messages').insert({
+                        session_id: session.id,
+                        sender_type: 'patient',
+                        content: messageText
+                    });
 
-                const { data: history } = await supabase
-                    .from('messages')
-                    .select('sender_type, content')
-                    .eq('session_id', session.id)
-                    .gte('created_at', sixtyDaysAgo.toISOString())
-                    .order('created_at', { ascending: true });
+                    // 3. Busca o histórico dos últimos 60 dias
+                    const sixtyDaysAgo = new Date();
+                    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-                // Formata para o Gemini (apenas 'user' ou 'model')
-                const chatHistory = history.map(msg => ({
-                    role: msg.sender_type === 'patient' ? 'user' : 'model',
-                    parts: [{ text: msg.content }]
-                }));
+                    const { data: history } = await supabase
+                        .from('messages')
+                        .select('sender_type, content')
+                        .eq('session_id', session.id)
+                        .gte('created_at', sixtyDaysAgo.toISOString())
+                        .order('created_at', { ascending: true });
 
-                // Prompt de sistema para instruir o Gemini
-                const systemInstruction = `Você é um assistente virtual gentil e prestativo para Agentes Comunitários de Saúde (ACS). 
+                    // Formata para o Gemini (apenas 'user' ou 'model')
+                    const chatHistory = history.map(msg => ({
+                        role: msg.sender_type === 'patient' ? 'user' : 'model',
+                        parts: [{ text: msg.content }]
+                    }));
+
+                    // Prompt de sistema para instruir o Gemini
+                    const systemInstruction = `Você é um assistente virtual gentil e prestativo para Agentes Comunitários de Saúde (ACS). 
 Você está conversando com o paciente: ${patient.name}. 
 Seja muito educado, use linguagem acessível e curta. 
 Se for perguntado sobre dados médicos, diga que você ainda está em fase de treinamento e só pode agendar visitas do ACS.`;
 
-                // 4. Envia o histórico completo para a IA
-                const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: chatHistory,
-                    config: {
-                        systemInstruction: systemInstruction,
-                        temperature: 0.7
-                    }
-                });
-                
-                replyText = response.text || "Desculpe, não consegui processar sua mensagem agora.";
+                    // 4. Envia o histórico completo para a IA
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-1.5-flash',
+                        contents: chatHistory,
+                        config: {
+                            systemInstruction: systemInstruction,
+                            temperature: 0.7
+                        }
+                    });
+                    
+                    replyText = response.text || "Desculpe, não consegui processar sua mensagem agora.";
 
-                // 5. Grava a resposta da IA no banco
-                await supabase.from('messages').insert({
-                    session_id: session.id,
-                    sender_type: 'bot',
-                    content: replyText
-                });
+                    // 5. Grava a resposta da IA no banco
+                    await supabase.from('messages').insert({
+                        session_id: session.id,
+                        sender_type: 'bot',
+                        content: replyText
+                    });
 
-            } catch (aiError) {
-                console.error("Erro na lógica de IA/Banco:", aiError);
-                replyText = `Olá, ${patient.name}! Recebi sua mensagem, mas nosso cérebro artificial está temporariamente fora do ar.`;
+                } catch (aiError) {
+                    console.error("Erro na lógica de IA/Banco:", aiError);
+                    replyText = `Olá, ${patient.name}! Recebi sua mensagem, mas nosso cérebro artificial está temporariamente fora do ar.`;
+                }
             }
         }
 
