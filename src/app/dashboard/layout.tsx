@@ -1,6 +1,27 @@
 import Link from 'next/link';
+import { createClient } from '@/utils/supabase/server';
+import { redirect } from 'next/navigation';
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient();
+  
+  // Buscar sessão
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    redirect('/login');
+  }
+
+  // Buscar perfil do ACS
+  const { data: acsProfile } = await supabase
+    .from('acs')
+    .select('name, ubs:ubs_id(name)')
+    .eq('auth_user_id', session.user.id)
+    .single();
+
+  const userName = acsProfile?.name || 'Administrador';
+  const unitName = acsProfile?.ubs?.name || 'Secretaria de Saúde';
+
   return (
     <div className="flex h-screen bg-[#F4F7F9] text-slate-800 font-sans selection:bg-teal-100">
       {/* Sidebar Premium */}
@@ -28,14 +49,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
         
         <div className="p-6">
-          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 relative group cursor-pointer hover:bg-slate-100 transition-colors">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0"></div>
-              <div>
-                <p className="text-sm font-bold text-slate-700">Dr. Gestor</p>
-                <p className="text-xs text-slate-500">Administrador</p>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex-shrink-0 flex items-center justify-center text-white font-bold">
+                {userName.charAt(0)}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-bold text-slate-700 truncate">{userName}</p>
+                <p className="text-xs text-slate-500 truncate" title={unitName}>{unitName}</p>
               </div>
             </div>
+            {/* Botão Sair sutil */}
+            <form action="/auth/signout" method="post" className="mt-3 border-t border-slate-200 pt-3">
+              <button type="submit" className="text-xs font-bold text-rose-500 hover:text-rose-600 uppercase tracking-widest w-full text-left">
+                Sair do Sistema
+              </button>
+            </form>
           </div>
         </div>
       </aside>

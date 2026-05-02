@@ -1,30 +1,84 @@
+"use client";
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      router.push('/dashboard');
+      router.refresh();
+    }
+  };
+
   return (
-    <div className="flex h-screen items-center justify-center bg-slate-100">
-      <div className="bg-white p-8 rounded-2xl shadow-lg max-w-sm w-full">
-        <h2 className="text-2xl font-bold text-center text-slate-800 mb-6">Acesso ACS</h2>
-        <form className="space-y-4">
+    <div className="flex h-screen items-center justify-center bg-[#F4F7F9]">
+      <div className="bg-white p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 max-w-sm w-full relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-bl-full -z-10"></div>
+        
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-500 shadow-sm flex items-center justify-center mb-4">
+            <span className="text-white font-bold text-2xl">+</span>
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Acesso ACS</h2>
+          <p className="text-sm text-slate-500 mt-1">Secretaria de Saúde</p>
+        </div>
+
+        {error && (
+          <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-sm font-medium mb-6 text-center border border-rose-100">
+            Credenciais inválidas.
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">E-mail ou CPF</label>
             <input 
               type="email" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all text-slate-800 font-medium"
               placeholder="seu@email.com"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Senha</label>
             <input 
               type="password" 
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all text-slate-800 font-medium"
               placeholder="••••••••"
             />
           </div>
           <button 
-            type="button"
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-2xl shadow-[0_4px_14px_rgba(20,184,166,0.39)] transition-all mt-4"
           >
-            Entrar
+            {loading ? 'Autenticando...' : 'Entrar no Painel'}
           </button>
         </form>
       </div>
