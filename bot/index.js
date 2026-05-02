@@ -117,12 +117,14 @@ client.on('message', async (message) => {
                 console.log(`Paciente ${patient.name} encontrado e validado. Consultando IA Gemini...`);
                 
                 try {
-                    // 1. Busca ou cria sessão ativa
+                    // 1. Busca ou cria sessão (ativa ou escalada)
                     let { data: session } = await supabase
                         .from('chat_sessions')
                         .select('*')
                         .eq('patient_id', patient.id)
-                        .eq('status', 'active')
+                        .in('status', ['active', 'escalated'])
+                        .order('updated_at', { ascending: false })
+                        .limit(1)
                         .maybeSingle();
 
                     if (!session) {
@@ -133,6 +135,9 @@ client.on('message', async (message) => {
                             .single();
                         if (error) throw error;
                         session = newSession;
+                    } else {
+                        // Atualiza a data da sessão
+                        await supabase.from('chat_sessions').update({ updated_at: new Date().toISOString() }).eq('id', session.id);
                     }
 
                     // 2. Grava a mensagem do paciente no banco
@@ -141,6 +146,12 @@ client.on('message', async (message) => {
                         sender_type: 'patient',
                         content: messageText
                     });
+
+                    // Se a sessão estiver com o humano (escalated), não aciona a IA
+                    if (session.status === 'escalated') {
+                        console.log(`Sessão de ${patient.name} está com o ACS (Transbordo). IA ignorada.`);
+                        return;
+                    }
 
                     // 3. Busca o histórico dos últimos 60 dias
                     const sixtyDaysAgo = new Date();
@@ -199,6 +210,31 @@ Se for perguntado sobre dados médicos, diga que você ainda está em fase de tr
         console.error("Erro no processamento da mensagem:", error);
     }
 });
+
+// Escuta o banco de dados por mensagens enviadas pelo ACS no painel
+supabase.channel('acs_outbound')
+    .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages',
+        filter: "sender_type=eq.acs"
+    }, async (payload) => {
+        const msg = payload.new;
+        try {
+            const { data: session } = await supabase.from('chat_sessions').select('patient_id').eq('id', msg.session_id).single();
+            if (session) {
+                const { data: patient } = await supabase.from('patients').select('phone_number').eq('id', session.patient_id).single();
+                if (patient) {
+                    const chatId = `${patient.phone_number}@c.us`;
+                    console.log(`👨‍⚕️ Disparando resposta do ACS para ${patient.phone_number}: ${msg.content}`);
+                    await client.sendMessage(chatId, msg.content);
+                }
+            }
+        } catch (err) {
+            console.error("Erro ao enviar mensagem do ACS:", err);
+        }
+    })
+    .subscribe();
 
 // Inicializa
 console.log("Iniciando o cliente do WhatsApp Web...");
