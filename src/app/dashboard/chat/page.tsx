@@ -105,67 +105,74 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-full bg-slate-50">
+    <div className="flex h-full bg-[#F4F7F9] p-6 gap-6">
       {/* Lista de Contatos */}
-      <div className="w-80 border-r border-slate-200 bg-white flex flex-col">
-        <div className="p-4 border-b border-slate-200 bg-slate-100">
-          <h2 className="font-bold text-slate-800">Atendimentos</h2>
+      <div className="w-96 rounded-3xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden">
+        <div className="p-6 border-b border-slate-50 bg-white">
+          <h2 className="font-extrabold text-xl text-slate-800 tracking-tight">Atendimentos</h2>
+          <p className="text-sm text-slate-500 mt-1">Sessões ativas no momento</p>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-2">
           {sessions.map(session => (
             <div 
               key={session.id} 
               onClick={() => setSelectedSession(session)}
-              className={`p-4 border-b border-slate-100 cursor-pointer transition-colors ${selectedSession?.id === session.id ? 'bg-teal-50 border-l-4 border-l-teal-500' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
+              className={`p-4 mx-2 mb-2 rounded-2xl cursor-pointer transition-all duration-200 ${selectedSession?.id === session.id ? 'bg-teal-50 shadow-sm border border-teal-100/50' : 'hover:bg-slate-50 border border-transparent'}`}
             >
               <div className="flex justify-between items-start">
                 <span className="font-bold text-slate-800">{session.patients?.name || 'Desconhecido'}</span>
-                {session.status === 'escalated' && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold">Aguardando ACS</span>}
-                {session.status === 'active' && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">Com a IA</span>}
+                {session.status === 'escalated' && <span className="bg-rose-100 text-rose-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Aguardando ACS</span>}
+                {session.status === 'active' && <span className="bg-sky-100 text-sky-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Com a IA</span>}
               </div>
-              <p className="text-sm text-slate-500 mt-1 truncate">{session.patients?.phone_number}</p>
+              <p className="text-sm text-slate-500 mt-1 font-medium">{session.patients?.phone_number}</p>
             </div>
           ))}
-          {sessions.length === 0 && <p className="p-4 text-slate-500 text-center">Nenhum chat ativo.</p>}
+          {sessions.length === 0 && <p className="p-6 text-slate-400 text-center font-medium">Nenhum chat ativo no momento.</p>}
         </div>
       </div>
 
       {/* Área do Chat */}
-      <div className="flex-1 flex flex-col bg-slate-50">
+      <div className="flex-1 rounded-3xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden relative">
         {selectedSession ? (
           <>
             {/* Header do Chat */}
-            <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm z-10">
-              <div>
-                <h2 className="font-bold text-lg text-slate-800">{selectedSession.patients?.name}</h2>
-                <p className="text-sm text-slate-500">{selectedSession.patients?.phone_number}</p>
+            <div className="p-6 bg-white border-b border-slate-50 flex justify-between items-center z-10 relative">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-lg">
+                  {selectedSession.patients?.name?.charAt(0)}
+                </div>
+                <div>
+                  <h2 className="font-extrabold text-lg text-slate-800">{selectedSession.patients?.name}</h2>
+                  <p className="text-sm text-slate-500 font-medium">{selectedSession.patients?.phone_number}</p>
+                </div>
               </div>
-              <div className="space-x-2">
+              <div className="space-x-3">
                 {selectedSession.status === 'active' && (
-                  <button onClick={assumirAtendimento} className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+                  <button onClick={assumirAtendimento} className="bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-[0_4px_14px_rgba(244,63,94,0.39)] transition-all flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                     Assumir (Desligar IA)
                   </button>
                 )}
                 {selectedSession.status === 'escalated' && (
-                  <button onClick={resolverAtendimento} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
-                    Resolver Atendimento
+                  <button onClick={resolverAtendimento} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-[0_4px_14px_rgba(16,185,129,0.39)] transition-all">
+                    ✓ Resolver Atendimento
                   </button>
                 )}
               </div>
             </div>
 
             {/* Balões de Mensagem */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-100">
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/50 relative">
               {messages.map(msg => {
                 const isPatient = msg.sender_type === 'patient';
                 const isBot = msg.sender_type === 'bot';
                 
                 return (
                   <div key={msg.id} className={`flex ${isPatient ? 'justify-start' : 'justify-end'}`}>
-                    <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${isPatient ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200' : isBot ? 'bg-teal-100 text-teal-900 rounded-tr-none' : 'bg-blue-600 text-white rounded-tr-none'}`}>
-                      {!isPatient && <div className="text-xs opacity-75 mb-1 font-bold">{isBot ? '🤖 IA (Robô)' : '👨‍⚕️ Agente (ACS)'}</div>}
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                      <span className="text-[10px] opacity-60 block mt-2 text-right">
+                    <div className={`max-w-[65%] rounded-3xl p-5 shadow-sm relative ${isPatient ? 'bg-white text-slate-700 rounded-tl-sm border border-slate-100' : isBot ? 'bg-gradient-to-br from-teal-50 to-emerald-50 text-teal-900 rounded-tr-sm border border-teal-100/50' : 'bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-tr-sm shadow-[0_4px_14px_rgba(14,165,233,0.3)]'}`}>
+                      {!isPatient && <div className={`text-[10px] uppercase tracking-widest mb-2 font-bold ${isBot ? 'text-teal-600' : 'text-sky-100'}`}>{isBot ? '🤖 IA Assistente' : '👨‍⚕️ Agente (ACS)'}</div>}
+                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      <span className={`text-[10px] font-bold block mt-3 text-right ${isPatient ? 'text-slate-400' : isBot ? 'text-teal-600/60' : 'text-blue-100'}`}>
                         {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </span>
                     </div>
@@ -177,29 +184,34 @@ export default function ChatPage() {
 
             {/* Input de Mensagem */}
             {selectedSession.status === 'escalated' ? (
-              <div className="p-4 bg-white border-t border-slate-200">
-                <form onSubmit={enviarMensagem} className="flex gap-2">
+              <div className="p-6 bg-white border-t border-slate-50">
+                <form onSubmit={enviarMensagem} className="flex gap-3">
                   <input 
                     type="text" 
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Digite sua mensagem para o paciente..." 
-                    className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="flex-1 px-6 py-4 bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all placeholder:text-slate-400 font-medium"
                   />
-                  <button type="submit" disabled={!newMessage.trim()} className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white px-6 py-3 rounded-xl font-bold transition-colors">
+                  <button type="submit" disabled={!newMessage.trim()} className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:from-slate-200 disabled:to-slate-300 disabled:text-slate-400 disabled:shadow-none text-white px-8 py-4 rounded-2xl font-bold shadow-[0_4px_14px_rgba(14,165,233,0.39)] transition-all">
                     Enviar
                   </button>
                 </form>
               </div>
             ) : (
-              <div className="p-4 bg-slate-200 border-t border-slate-300 text-center text-slate-500 font-medium">
-                A Inteligência Artificial está conversando com o paciente. Assuma o atendimento para enviar mensagens.
+              <div className="p-6 bg-slate-50/80 border-t border-slate-100 text-center text-slate-500 font-medium flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+                A Inteligência Artificial está conduzindo este atendimento.
               </div>
             )}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400">
-            <p className="text-xl">Selecione um atendimento na lista ao lado.</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <span className="text-3xl">💬</span>
+            </div>
+            <p className="text-xl font-bold text-slate-600">Nenhum atendimento selecionado</p>
+            <p className="text-sm mt-2">Escolha um paciente na lista lateral para visualizar a conversa.</p>
           </div>
         )}
       </div>
