@@ -29,6 +29,28 @@ export default async function BibliotecaPage() {
     revalidatePath('/dashboard/biblioteca');
   }
 
+  async function deleteTemplate(formData: FormData) {
+    "use server";
+    const supabase = await createClient();
+    const id = formData.get('id');
+    if (!id) return;
+    await supabase.from('health_templates').delete().eq('id', id);
+    revalidatePath('/dashboard/biblioteca');
+  }
+
+  async function editTemplate(formData: FormData) {
+    "use server";
+    const supabase = await createClient();
+    const id = formData.get('id');
+    if (!id) return;
+    await supabase.from('health_templates').update({
+      category: formData.get('category'),
+      title: formData.get('title'),
+      content: formData.get('content')
+    }).eq('id', id);
+    revalidatePath('/dashboard/biblioteca');
+  }
+
   const categoryColors: Record<string, string> = {
     'nutricao': 'bg-orange-100 text-orange-700',
     'educacao_fisica': 'bg-blue-100 text-blue-700',
@@ -88,12 +110,22 @@ export default async function BibliotecaPage() {
           <h2 className="font-bold text-lg text-slate-800 mb-4">Templates Disponíveis</h2>
           {templates && templates.length > 0 ? (
             templates.map(template => (
-              <div key={template.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-3">
+              <div key={template.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-3 group relative overflow-hidden">
+                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                   {/* O botão de Editar poderia abrir um modal, por simplicidade estamos apenas usando o botão Delete por enquanto, ou podemos usar Client Components depois */}
+                   <form action={deleteTemplate}>
+                      <input type="hidden" name="id" value={template.id} />
+                      <button type="submit" title="Excluir Template" className="bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200 p-2 rounded-xl shadow-sm transition-all">
+                        🗑️
+                      </button>
+                   </form>
+                </div>
+                
                 <div className="flex justify-between items-start">
                   <span className={`text-[10px] uppercase tracking-wider px-3 py-1 rounded-full font-bold ${categoryColors[template.category]}`}>
                     {categoryNames[template.category]}
                   </span>
-                  <span className="text-xs text-slate-400 font-medium">
+                  <span className="text-xs text-slate-400 font-medium mr-10">
                     Autor: {template.acs?.name || 'Sistema'}
                   </span>
                 </div>

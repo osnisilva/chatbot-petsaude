@@ -73,6 +73,19 @@ export default async function AgendamentosPage() {
     revalidatePath('/dashboard/agendamentos');
   }
 
+  // -----------------------------------------------------
+  // Ação de Servidor: Excluir/Cancelar Agendamento
+  // -----------------------------------------------------
+  async function deleteSchedule(formData: FormData) {
+    "use server";
+    const supabase = await createClient();
+    const id = formData.get('schedule_id');
+    if (!id) return;
+
+    await supabase.from('scheduled_messages').delete().eq('id', id);
+    revalidatePath('/dashboard/agendamentos');
+  }
+
   return (
     <div className="p-8 h-full overflow-y-auto">
       <div className="flex justify-between items-end mb-8">
@@ -143,6 +156,7 @@ export default async function AgendamentosPage() {
                   <th className="p-4 font-bold">Frequência</th>
                   <th className="p-4 font-bold">Próximo Envio</th>
                   <th className="p-4 font-bold">Status</th>
+                  <th className="p-4 font-bold text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -164,11 +178,19 @@ export default async function AgendamentosPage() {
                           Ativo
                         </span>
                       </td>
+                      <td className="p-4 text-right">
+                        <form action={deleteSchedule}>
+                          <input type="hidden" name="schedule_id" value={schedule.id} />
+                          <button type="submit" title="Cancelar Campanha" className="text-slate-400 hover:text-rose-500 transition-colors p-2 rounded-lg hover:bg-rose-50">
+                            🗑️
+                          </button>
+                        </form>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-500 font-medium">
+                    <td colSpan={6} className="p-8 text-center text-slate-500 font-medium">
                       Nenhuma campanha ativa no momento.
                     </td>
                   </tr>
