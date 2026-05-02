@@ -46,6 +46,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/dashboard/chat" className="block px-4 py-3 rounded-2xl transition-all duration-200 hover:bg-teal-50 hover:text-teal-700 text-slate-500 font-medium hover:shadow-[0_2px_10px_rgba(20,184,166,0.05)]">
             Chat ao Vivo
           </Link>
+          
+          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 mt-6 mb-2">Trilhas de Cuidado</div>
+          <Link href="/dashboard/biblioteca" className="block px-4 py-3 rounded-2xl transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-700 text-slate-500 font-medium hover:shadow-[0_2px_10px_rgba(16,185,129,0.05)] flex items-center gap-2">
+            📚 Biblioteca
+          </Link>
+          <Link href="/dashboard/agendamentos" className="block px-4 py-3 rounded-2xl transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-700 text-slate-500 font-medium hover:shadow-[0_2px_10px_rgba(16,185,129,0.05)] flex items-center gap-2">
+            📅 Agendamentos (ACS)
+          </Link>
         </nav>
         
         <div className="p-6">

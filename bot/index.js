@@ -2,6 +2,7 @@ require('dotenv').config({ path: '.env.local' });
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { createClient } = require('@supabase/supabase-js');
+const { initCronJobs } = require('./cron');
 
 // Configuração do Supabase
 const supabase = createClient(
@@ -66,6 +67,9 @@ client.on('qr', (qr) => {
 
 client.on('ready', () => {
     console.log('🤖 Bot do WhatsApp conectado e pronto para uso!');
+    
+    // Iniciar serviço de disparos programados (Trilhas de Cuidado)
+    initCronJobs(client);
 });
 
 client.on('message', async (message) => {
