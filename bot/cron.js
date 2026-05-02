@@ -7,9 +7,9 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Função auxiliar para calcular a próxima data
-function calculateNextRunAt(frequency, currentRunDate) {
-    const nextRun = new Date(currentRunDate);
+// Função auxiliar para calcular a próxima data (baseada no momento do envio real)
+function calculateNextRunAt(frequency) {
+    const nextRun = new Date(); // Usa o horário atual em que foi realmente enviado
     switch (frequency) {
         case 'diario':
             nextRun.setDate(nextRun.getDate() + 1);
@@ -24,16 +24,22 @@ function calculateNextRunAt(frequency, currentRunDate) {
             nextRun.setMonth(nextRun.getMonth() + 1);
             break;
         default:
-            nextRun.setDate(nextRun.getDate() + 1); // Padrão
+            nextRun.setDate(nextRun.getDate() + 1);
     }
     return nextRun.toISOString();
 }
 
 async function processScheduledMessages(whatsappClient) {
+    const currentHour = new Date().getHours();
+    
+    // Trava de Segurança Global: O robô descansa de madrugada (das 20h às 06h)
+    if (currentHour >= 20 || currentHour < 6) {
+        return;
+    }
+
     console.log('[CRON] Verificando agendamentos pendentes...');
     const now = new Date().toISOString();
 
-    // Buscar agendamentos ativos cuja data de envio já chegou
     const { data: schedules, error } = await supabase
         .from('scheduled_messages')
         .select(`
@@ -42,7 +48,7 @@ async function processScheduledMessages(whatsappClient) {
             next_run_at,
             patient_id,
             patients ( phone_number, name ),
-            health_templates ( title, content )
+            health_templates ( title, category, content )
         `)
         .eq('status', 'active')
         .lte('next_run_at', now);
@@ -52,13 +58,39 @@ async function processScheduledMessages(whatsappClient) {
         return;
     }
 
-    if (!schedules || schedules.length === 0) {
+    if (!schedules || schedules.length === 0) return;
+
+    // Filtro Inteligente de Horários por Categoria
+    const schedulesToSend = schedules.filter(s => {
+        const cat = s.health_templates.category;
+        
+        // Remédios: Manhã (07:00 às 09:59)
+        if (cat === 'lembrete_medicamento') {
+            return currentHour >= 7 && currentHour <= 9;
+        }
+        // Nutrição (Alimentação): Almoço (11:00 às 13:59)
+        if (cat === 'nutricao') {
+            return currentHour >= 11 && currentHour <= 13;
+        }
+        // Educação Física: Tarde (16:00 às 18:59)
+        if (cat === 'educacao_fisica') {
+            return currentHour >= 16 && currentHour <= 18;
+        }
+        // Psicologia / Enfermagem / Bem-estar: Horário comercial amplo (09:00 às 18:00)
+        return currentHour >= 9 && currentHour <= 18;
+    });
+
+    if (schedulesToSend.length === 0) {
+        console.log(`[CRON] ${schedules.length} campanhas pendentes, mas nenhuma na janela de horário apropriada agora.`);
         return;
     }
 
-    console.log(`[CRON] Encontrados ${schedules.length} agendamentos para envio.`);
+    console.log(`[CRON] Disparando ${schedulesToSend.length} campanhas na janela de horário atual.`);
 
-    for (const schedule of schedules) {
+    // Limite anti-banimento: Processar no máximo 20 por ciclo
+    const batch = schedulesToSend.slice(0, 20);
+
+    for (const schedule of batch) {
         try {
             const phoneNumber = schedule.patients.phone_number;
             const content = schedule.health_templates.content;
@@ -85,8 +117,8 @@ async function processScheduledMessages(whatsappClient) {
             const pause = Math.floor(Math.random() * (10000 - 5000 + 1) + 5000);
             await new Promise(r => setTimeout(r, pause));
 
-            // Calcular próxima data
-            const nextRun = calculateNextRunAt(schedule.frequency, schedule.next_run_at);
+            // Calcular próxima data (usa o horário atual por padrão dentro da função)
+            const nextRun = calculateNextRunAt(schedule.frequency);
 
             // Atualizar banco
             await supabase
