@@ -1,14 +1,22 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
+import Link from 'next/link';
 
-export default async function BibliotecaPage() {
+export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const supabase = await createClient();
+  const params = await searchParams;
   
   // Buscar templates
-  const { data: templates } = await supabase
+  let query = supabase
     .from('health_templates')
     .select(`*, acs:created_by(name)`)
     .order('created_at', { ascending: false });
+
+  if (params.category) {
+    query = query.eq('category', params.category);
+  }
+
+  const { data: templates } = await query;
 
   async function createTemplate(formData: FormData) {
     "use server";
@@ -107,7 +115,19 @@ export default async function BibliotecaPage() {
 
         {/* Lista de Templates */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="font-bold text-lg text-slate-800 mb-4">Templates Disponíveis</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-bold text-lg text-slate-800">Templates Disponíveis</h2>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              <Link href="/dashboard/biblioteca" className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${!params.category ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                Todos
+              </Link>
+              {Object.keys(categoryNames).map(cat => (
+                <Link key={cat} href={`/dashboard/biblioteca?category=${cat}`} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors whitespace-nowrap ${params.category === cat ? categoryColors[cat] : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {categoryNames[cat]}
+                </Link>
+              ))}
+            </div>
+          </div>
           {templates && templates.length > 0 ? (
             templates.map(template => (
               <div key={template.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-3 group relative overflow-hidden">
