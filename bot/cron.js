@@ -32,8 +32,8 @@ function calculateNextRunAt(frequency) {
 async function processScheduledMessages(whatsappClient) {
     const currentHour = new Date().getHours();
     
-    // Trava de Segurança Global: O robô descansa de madrugada (das 20h às 06h)
-    if (currentHour >= 20 || currentHour < 6) {
+    // Trava de Segurança Global: O robô só trabalha entre 08:00 e 18:00 (limite estrito)
+    if (currentHour < 8 || currentHour >= 18) {
         return;
     }
 
@@ -64,20 +64,20 @@ async function processScheduledMessages(whatsappClient) {
     const schedulesToSend = schedules.filter(s => {
         const cat = s.health_templates.category;
         
-        // Remédios: Manhã (07:00 às 09:59)
+        // Remédios: Manhã (08:00 às 09:59)
         if (cat === 'lembrete_medicamento') {
-            return currentHour >= 7 && currentHour <= 9;
+            return currentHour >= 8 && currentHour <= 9;
         }
         // Nutrição (Alimentação): Almoço (11:00 às 13:59)
         if (cat === 'nutricao') {
             return currentHour >= 11 && currentHour <= 13;
         }
-        // Educação Física: Tarde (16:00 às 18:59)
+        // Educação Física: Tarde (16:00 às 17:59) - ajustado para o limite global
         if (cat === 'educacao_fisica') {
-            return currentHour >= 16 && currentHour <= 18;
+            return currentHour >= 16 && currentHour < 18;
         }
-        // Psicologia / Enfermagem / Bem-estar: Horário comercial amplo (09:00 às 18:00)
-        return currentHour >= 9 && currentHour <= 18;
+        // Psicologia / Enfermagem / Bem-estar: Horário comercial amplo (08:00 às 18:00)
+        return currentHour >= 8 && currentHour < 18;
     });
 
     if (schedulesToSend.length === 0) {
