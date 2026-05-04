@@ -26,8 +26,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex h-screen bg-[#F4F7F9] text-slate-800 font-sans selection:bg-teal-100">
       {/* Sidebar Premium */}
       <aside className="w-64 bg-white flex flex-col border-r border-slate-100 shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10">
-        <div className="p-6 flex flex-col gap-4">
-          <div className="flex items-center gap-2 px-2 border-slate-50">
+        <div className="p-4 flex flex-col gap-2">
+          <img
+            src="/logo-acs.png"
+            alt="Secretaria Municipal de Saúde de Piraí e PET-Saúde"
+            className="w-full h-auto object-contain max-h-20"
+          />
+          <div className="flex items-center gap-2 px-2 border-t border-slate-100 pt-3">
             <div className="w-2 h-6 bg-teal-500 rounded-full"></div>
             <span className="text-xl font-black text-slate-800 tracking-tighter">
               ACS-Online

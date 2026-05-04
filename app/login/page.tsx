@@ -37,10 +37,12 @@ export default function LoginPage() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-bl-full -z-10"></div>
         
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-500 shadow-sm flex items-center justify-center mb-4">
-            <span className="text-white font-bold text-2xl">+</span>
-          </div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tighter">ACS-Online</h2>
+          <img
+            src="/logo-acs.png"
+            alt="Secretaria Municipal de Saúde de Piraí e PET-Saúde"
+            className="w-full max-w-xs h-auto object-contain mb-4"
+          />
+          <h2 className="text-2xl font-black text-slate-800 tracking-tighter">ACS-Online</h2>
           <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mt-1">Portal do Agente de Saúde</p>
         </div>
 
