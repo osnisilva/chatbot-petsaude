@@ -146,7 +146,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
                     {categoryNames[template.category]}
                   </span>
                   <span className="text-xs text-slate-400 font-medium mr-10">
-                    Autor: {template.acs?.name || 'Sistema'}
+                    Autor: {(template.acs as any)?.name || 'Sistema'}
                   </span>
                 </div>
                 <h3 className="font-extrabold text-xl text-slate-800">{template.title}</h3>

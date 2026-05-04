@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .single();
 
   const userName = acsProfile?.name || 'Administrador';
-  const unitName = acsProfile?.ubs?.name || 'Secretaria de Saúde';
+  const unitName = (acsProfile?.ubs as any)?.name || 'Secretaria de Saúde';
 
   return (
     <div className="flex h-screen bg-[#F4F7F9] text-slate-800 font-sans selection:bg-teal-100">

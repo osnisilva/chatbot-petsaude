@@ -66,7 +66,7 @@ export default function PacientesPage() {
                     <td className="p-6 font-bold text-slate-700">{p.name}</td>
                     <td className="p-6 text-slate-500 font-medium">{p.phone_number}</td>
                     <td className="p-6 text-slate-400 font-mono text-sm">{p.cns_masked || '-'}</td>
-                    <td className="p-6 text-slate-500">{p.ubs?.name || '-'}</td>
+                    <td className="p-6 text-slate-500">{(p.ubs as any)?.name || '-'}</td>
                     <td className="p-6">
                       {p.lgpd_consent === true && <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Aceito</span>}
                       {p.lgpd_consent === false && <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Recusado</span>}

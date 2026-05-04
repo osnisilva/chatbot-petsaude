@@ -117,7 +117,7 @@ export default function ChatPage() {
               className={`p-4 mx-2 mb-2 rounded-2xl cursor-pointer transition-all duration-200 ${selectedSession?.id === session.id ? 'bg-teal-50 shadow-sm border border-teal-100/50' : 'hover:bg-slate-50 border border-transparent'}`}
             >
               <div className="flex justify-between items-start">
-                <span className="font-bold text-slate-800">{session.patients?.name || 'Desconhecido'}</span>
+                <span className="font-bold text-slate-800">{(session.patients as any)?.name || 'Desconhecido'}</span>
                 {session.status === 'escalated' && <span className="bg-rose-100 text-rose-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Aguardando ACS</span>}
                 {session.status === 'active' && <span className="bg-sky-100 text-sky-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Com a IA</span>}
               </div>
@@ -136,10 +136,10 @@ export default function ChatPage() {
             <div className="p-6 bg-white border-b border-slate-50 flex justify-between items-center z-10 relative">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-lg">
-                  {selectedSession.patients?.name?.charAt(0)}
+                  {(selectedSession.patients as any)?.name?.charAt(0)}
                 </div>
                 <div>
-                  <h2 className="font-extrabold text-lg text-slate-800">{selectedSession.patients?.name}</h2>
+                  <h2 className="font-extrabold text-lg text-slate-800">{(selectedSession.patients as any)?.name}</h2>
                   <p className="text-sm text-slate-500 font-medium">{selectedSession.patients?.phone_number}</p>
                 </div>
               </div>

@@ -14,7 +14,7 @@ export default async function AgendamentosPage() {
     .eq('auth_user_id', session.user.id)
     .single();
 
-  const isSecretaria = acs?.ubs?.name === 'Secretaria de Saúde';
+  const isSecretaria = (acs?.ubs as any)?.name === 'Secretaria de Saúde';
 
   // 2. Buscar Pacientes elegíveis (Aqueles que têm comorbidades registradas)
   // Se for secretaria, vê todos com comorbidade. Se for ACS comum, só da sua UBS.
@@ -163,8 +163,8 @@ export default async function AgendamentosPage() {
                 {schedules && schedules.length > 0 ? (
                   schedules.map(schedule => (
                     <tr key={schedule.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 font-bold text-slate-800">{schedule.patient?.name}</td>
-                      <td className="p-4 text-slate-600 font-medium">{schedule.template?.title}</td>
+                      <td className="p-4 font-bold text-slate-800">{(schedule.patient as any)?.name}</td>
+                      <td className="p-4 text-slate-600 font-medium">{(schedule.template as any)?.title}</td>
                       <td className="p-4">
                         <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-lg font-bold capitalize">
                           {schedule.frequency}
