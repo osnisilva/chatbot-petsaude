@@ -38,7 +38,7 @@ export default function LoginPage() {
         
         <div className="flex flex-col items-center mb-8">
           <img 
-            src="/images/logos-full.png" 
+            src="/logo.png" 
             alt="Logos Secretaria de Saúde e PET-Saúde" 
             className="w-full h-auto object-contain max-h-24 mb-6"
           />

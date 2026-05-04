@@ -29,10 +29,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="p-6 flex flex-col gap-4">
           <div className="w-full flex justify-center">
             <img 
-              src="/images/logos-full.png" 
-              alt="Logos Secretaria de Saúde e PET-Saúde" 
-              className="w-full h-auto object-contain max-h-24"
-            />
+            src="/logo.png" 
+            alt="Logos Secretaria de Saúde e PET-Saúde" 
+            className="w-full h-auto object-contain max-h-24 mb-6"
+          />
           </div>
           <div className="flex items-center gap-2 px-2 border-t border-slate-50 pt-4">
             <div className="w-2 h-6 bg-teal-500 rounded-full"></div>
