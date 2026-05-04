@@ -1,6 +1,5 @@
-import Link from 'next/link';
-import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
+import { ACS_LOGO_BASE64 } from '../logo-data';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -29,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="p-6 flex flex-col gap-4">
           <div className="w-full flex justify-center">
             <img 
-              src="/acs-logo.png" 
+              src={ACS_LOGO_BASE64} 
               alt="Logos Secretaria de Saúde e PET-Saúde" 
               className="w-full h-auto object-contain max-h-24 mb-6"
             />

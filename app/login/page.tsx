@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
+import { ACS_LOGO_BASE64 } from '../logo-data';
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +40,7 @@ export default function LoginPage() {
         
         <div className="flex flex-col items-center mb-8">
           <img 
-            src="/acs-logo.png" 
+            src={ACS_LOGO_BASE64} 
             alt="Logos Secretaria de Saúde e PET-Saúde" 
             className="w-full h-auto object-contain max-h-24 mb-6"
           />
