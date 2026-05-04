@@ -32,12 +32,18 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Redirecionamentos inteligentes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!user) {
+    // Se não estiver logado e tentar acessar o dashboard ou a página inicial (/)
+    if (request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname === '/') {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (user) {
+    // Se estiver logado e tentar acessar o login ou a página inicial (/)
+    if (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return supabaseResponse
