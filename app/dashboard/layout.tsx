@@ -26,13 +26,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex h-screen bg-[#F4F7F9] text-slate-800 font-sans selection:bg-teal-100">
       {/* Sidebar Premium */}
       <aside className="w-64 bg-white flex flex-col border-r border-slate-100 shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10">
-        <div className="p-8 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 shadow-sm flex items-center justify-center">
-            <span className="text-white font-bold text-lg">+</span>
+        <div className="p-6 flex flex-col gap-4">
+          <div className="w-full flex justify-center">
+            <img 
+              src="/images/logos-full.png" 
+              alt="Logos Secretaria de Saúde e PET-Saúde" 
+              className="w-full h-auto object-contain max-h-24"
+            />
           </div>
-          <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-700 to-slate-900 tracking-tight">
-            Painel Saúde
-          </span>
+          <div className="flex items-center gap-2 px-2 border-t border-slate-50 pt-4">
+            <div className="w-2 h-6 bg-teal-500 rounded-full"></div>
+            <span className="text-xl font-black text-slate-800 tracking-tighter">
+              ACS-Online
+            </span>
+          </div>
         </div>
         
         <nav className="flex-1 px-4 space-y-1.5 mt-2">

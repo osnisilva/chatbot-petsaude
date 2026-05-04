@@ -37,11 +37,13 @@ export default function LoginPage() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-bl-full -z-10"></div>
         
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-500 shadow-sm flex items-center justify-center mb-4">
-            <span className="text-white font-bold text-2xl">+</span>
-          </div>
-          <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">Acesso ACS</h2>
-          <p className="text-sm text-slate-500 mt-1">Secretaria de Saúde</p>
+          <img 
+            src="/images/logos-full.png" 
+            alt="Logos Secretaria de Saúde e PET-Saúde" 
+            className="w-full h-auto object-contain max-h-24 mb-6"
+          />
+          <h2 className="text-3xl font-black text-slate-800 tracking-tighter">ACS-Online</h2>
+          <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mt-1">Portal do Agente de Saúde</p>
         </div>
 
         {error && (
