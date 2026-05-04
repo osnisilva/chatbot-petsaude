@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { ACS_LOGO_BASE64 } from '../logo-data';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -26,14 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* Sidebar Premium */}
       <aside className="w-64 bg-white flex flex-col border-r border-slate-100 shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-10">
         <div className="p-6 flex flex-col gap-4">
-          <div className="w-full flex justify-center">
-            <img 
-              src={ACS_LOGO_BASE64} 
-              alt="Logos Secretaria de Saúde e PET-Saúde" 
-              className="w-full h-auto object-contain max-h-24 mb-6"
-            />
-          </div>
-          <div className="flex items-center gap-2 px-2 border-t border-slate-50 pt-4">
+          <div className="flex items-center gap-2 px-2 border-slate-50">
             <div className="w-2 h-6 bg-teal-500 rounded-full"></div>
             <span className="text-xl font-black text-slate-800 tracking-tighter">
               ACS-Online
