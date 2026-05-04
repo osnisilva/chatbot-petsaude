@@ -11,6 +11,7 @@ export default function Home() {
           alt="Next.js logo"
           width={100}
           height={20}
+          style={{ width: 'auto', height: 'auto' }}
           priority
         />
         <div className={styles.intro}>
@@ -48,6 +49,7 @@ export default function Home() {
               alt="Vercel logomark"
               width={16}
               height={16}
+              style={{ width: 'auto', height: 'auto' }}
             />
             Deploy Now
           </a>
