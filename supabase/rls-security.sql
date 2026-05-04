@@ -15,6 +15,12 @@ RETURNS UUID AS $$
   SELECT ubs_id FROM public.acs WHERE auth_user_id = auth.uid() LIMIT 1;
 $$ LANGUAGE sql SECURITY DEFINER;
 
+-- 2.1 Função Helper: Pegar o acs_id do usuário logado
+CREATE OR REPLACE FUNCTION get_user_acs_id()
+RETURNS UUID AS $$
+  SELECT id FROM public.acs WHERE auth_user_id = auth.uid() LIMIT 1;
+$$ LANGUAGE sql SECURITY DEFINER;
+
 -- 3. Função Helper: Verificar se o usuário é da Secretaria de Saúde (Admin)
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
@@ -39,24 +45,24 @@ DROP POLICY IF EXISTS "ACS vê a si mesmo ou Admin vê todos" ON public.acs;
 CREATE POLICY "ACS vê a si mesmo ou Admin vê todos" ON public.acs
     FOR SELECT USING (auth_user_id = auth.uid() OR is_admin());
 
--- PACIENTES: ACS só vê pacientes da sua UBS. Admin vê todos.
+-- PACIENTES: ACS só vê pacientes da sua MICROÁREA. Admin vê todos.
 DROP POLICY IF EXISTS "acs_can_read_own_patients_or_admin" ON public.patients;
 CREATE POLICY "acs_can_read_own_patients_or_admin" ON public.patients
     FOR SELECT USING (
-        is_admin() OR ubs_id = get_user_ubs_id()
+        is_admin() OR acs_id = get_user_acs_id()
     );
 
--- SESSÕES DE CHAT: ACS só vê chats de pacientes da sua UBS. Admin vê todos.
+-- SESSÕES DE CHAT: ACS só vê chats de pacientes da sua MICROÁREA. Admin vê todos.
 DROP POLICY IF EXISTS "acs_can_read_own_sessions" ON public.chat_sessions;
 CREATE POLICY "acs_can_read_own_sessions" ON public.chat_sessions
     FOR SELECT USING (
-        is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE ubs_id = get_user_ubs_id())
+        is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE acs_id = get_user_acs_id())
     );
 -- ACS pode atualizar o status da sessão (Assumir atendimento) se tiver permissão de visualização
 DROP POLICY IF EXISTS "acs_can_update_own_sessions" ON public.chat_sessions;
 CREATE POLICY "acs_can_update_own_sessions" ON public.chat_sessions
     FOR UPDATE USING (
-        is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE ubs_id = get_user_ubs_id())
+        is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE acs_id = get_user_acs_id())
     );
 
 -- MENSAGENS: ACS pode ver e inserir mensagens em chats que ele tem acesso
@@ -65,7 +71,7 @@ CREATE POLICY "acs_can_read_messages" ON public.messages
     FOR SELECT USING (
         session_id IN (
             SELECT id FROM public.chat_sessions 
-            WHERE is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE ubs_id = get_user_ubs_id())
+            WHERE is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE acs_id = get_user_acs_id())
         )
     );
 
@@ -74,7 +80,7 @@ CREATE POLICY "acs_can_insert_messages" ON public.messages
     FOR INSERT WITH CHECK (
         session_id IN (
             SELECT id FROM public.chat_sessions 
-            WHERE is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE ubs_id = get_user_ubs_id())
+            WHERE is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE acs_id = get_user_acs_id())
         )
         AND sender_type = 'acs'
     );
