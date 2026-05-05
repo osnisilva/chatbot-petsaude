@@ -67,7 +67,10 @@ export default function ChatPage() {
           setMessages(prev => [...prev, payload.new]);
           scrollToBottom();
         } else if (payload.eventType === 'UPDATE') {
-          setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
+          // Faz o "merge" do que mudou com o que já tínhamos para não perder campos (como sender_type)
+          setMessages(prev => prev.map(msg => 
+            msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
+          ));
         } else if (payload.eventType === 'DELETE') {
           setMessages(prev => prev.filter(msg => msg.id === payload.old.id));
         }
@@ -162,10 +165,19 @@ export default function ChatPage() {
 
   const salvarEdicao = async () => {
     if (!editingMsgId || !editValue.trim()) return;
-    await supabase.from('messages')
-      .update({ content: editValue, updated_at: new Date().toISOString() })
+    
+    const { error } = await supabase.from('messages')
+      .update({ 
+        content: editValue, 
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', editingMsgId);
-    setEditingMsgId(null);
+
+    if (error) {
+      alert('Erro ao salvar edição: ' + error.message);
+    } else {
+      setEditingMsgId(null);
+    }
   };
 
   const prepararUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -302,8 +314,8 @@ export default function ChatPage() {
                       ) : (
                         <p className={`text-sm md:text-base whitespace-pre-wrap leading-relaxed ${msg.is_deleted ? 'italic opacity-70 font-medium' : ''}`}>
                           {msg.content}
-                          {msg.updated_at !== msg.created_at && !msg.is_deleted && (
-                            <span className="text-[9px] ml-2 opacity-60">(editada)</span>
+                          {new Date(msg.updated_at).getTime() !== new Date(msg.created_at).getTime() && !msg.is_deleted && (
+                            <span className="text-[9px] ml-2 opacity-60 font-normal">(editada)</span>
                           )}
                         </p>
                       )}
