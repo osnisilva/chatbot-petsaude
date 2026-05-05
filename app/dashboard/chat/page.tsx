@@ -152,7 +152,21 @@ export default function ChatPage() {
 
   const deletarMensagem = async (msgId: string) => {
     if (!confirm('Tem certeza que deseja apagar esta mensagem para todos?')) return;
-    await supabase.from('messages').update({ is_deleted: true, content: '🚫 Esta mensagem foi apagada.' }).eq('id', msgId);
+
+    // Atualização Otimista
+    const oldMessages = [...messages];
+    setMessages(prev => prev.map(msg => 
+      msg.id === msgId ? { ...msg, is_deleted: true, content: '🚫 Esta mensagem foi apagada.' } : msg
+    ));
+
+    const { error } = await supabase.from('messages')
+      .update({ is_deleted: true, content: '🚫 Esta mensagem foi apagada.' })
+      .eq('id', msgId);
+
+    if (error) {
+      alert('Erro ao apagar mensagem: ' + error.message);
+      setMessages(oldMessages);
+    }
   };
 
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
