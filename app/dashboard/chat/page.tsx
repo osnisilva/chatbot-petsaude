@@ -88,6 +88,13 @@ export default function ChatPage() {
     setSelectedSession(null);
   };
 
+  const enviarMensagem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !selectedSession) return;
+
+    const texto = newMessage;
+    setNewMessage(''); // Limpa o input
+
     // O bot fará o disparo quando ver essa inserção no banco
     await supabase.from('messages').insert({
       session_id: selectedSession.id,
