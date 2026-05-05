@@ -9,6 +9,8 @@ export default function ChatPage() {
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Carrega as sessões ativas e escaladas
@@ -86,19 +88,52 @@ export default function ChatPage() {
     setSelectedSession(null);
   };
 
-  const enviarMensagem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !selectedSession) return;
-
-    const texto = newMessage;
-    setNewMessage(''); // Limpa o input
-
     // O bot fará o disparo quando ver essa inserção no banco
     await supabase.from('messages').insert({
       session_id: selectedSession.id,
       sender_type: 'acs',
       content: texto
     });
+  };
+
+  const fazerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSession) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${selectedSession.id}/${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // 1. Upload para o Storage
+      const { error: uploadError, data } = await supabase.storage
+        .from('chat-media')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 2. Pegar URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(filePath);
+
+      // 3. Salvar mensagem no banco com a URL da mídia
+      await supabase.from('messages').insert({
+        session_id: selectedSession.id,
+        sender_type: 'acs',
+        content: `Arquivo enviado: ${file.name}`,
+        media_url: publicUrl,
+        media_type: file.type,
+        media_name: file.name
+      });
+
+    } catch (error: any) {
+      alert('Erro ao enviar arquivo: ' + error.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -180,6 +215,23 @@ export default function ChatPage() {
                   <div key={msg.id} className={`flex ${isPatient ? 'justify-start' : 'justify-end'}`}>
                     <div className={`max-w-[85%] md:max-w-[65%] rounded-3xl p-4 md:p-5 shadow-sm relative ${isPatient ? 'bg-white text-slate-700 rounded-tl-sm border border-slate-100' : isBot ? 'bg-gradient-to-br from-teal-50 to-emerald-50 text-teal-900 rounded-tr-sm border border-teal-100/50' : 'bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-tr-sm shadow-[0_4px_14px_rgba(14,165,233,0.3)]'}`}>
                       {!isPatient && <div className={`text-[10px] uppercase tracking-widest mb-1.5 md:mb-2 font-bold ${isBot ? 'text-teal-600' : 'text-sky-100'}`}>{isBot ? '🤖 IA Assistente' : '👨‍⚕️ Agente (ACS)'}</div>}
+                      
+                      {msg.media_url ? (
+                        <div className="mb-2">
+                          {msg.media_type?.startsWith('image/') ? (
+                            <img src={msg.media_url} alt={msg.media_name} className="rounded-xl max-w-full h-auto border border-white/20 shadow-sm" />
+                          ) : (
+                            <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-colors border border-white/10">
+                              <span className="text-2xl">📄</span>
+                              <div className="overflow-hidden">
+                                <p className="text-sm font-bold truncate">{msg.media_name || 'Ver arquivo'}</p>
+                                <p className="text-[10px] opacity-70 uppercase">Documento</p>
+                              </div>
+                            </a>
+                          )}
+                        </div>
+                      ) : null}
+
                       <p className="text-sm md:text-base whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                       <span className={`text-[10px] font-bold block mt-2 md:mt-3 text-right ${isPatient ? 'text-slate-400' : isBot ? 'text-teal-600/60' : 'text-blue-100'}`}>
                         {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -194,7 +246,25 @@ export default function ChatPage() {
             {/* Input de Mensagem */}
             {selectedSession.status === 'escalated' ? (
               <div className="p-4 md:p-6 bg-white border-t border-slate-50">
-                <form onSubmit={enviarMensagem} className="flex gap-2 md:gap-3">
+                <form onSubmit={enviarMensagem} className="flex gap-2 md:gap-3 items-center">
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    ref={fileInputRef} 
+                    onChange={fazerUpload}
+                  />
+                  <button 
+                    type="button" 
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-3 md:p-4 bg-slate-50 text-slate-400 hover:text-sky-500 hover:bg-sky-50 rounded-2xl transition-all border border-slate-200"
+                  >
+                    {uploading ? (
+                      <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    )}
+                  </button>
                   <input 
                     type="text" 
                     value={newMessage}
@@ -202,7 +272,7 @@ export default function ChatPage() {
                     placeholder="Digite sua mensagem..." 
                     className="flex-1 px-4 md:px-6 py-3 md:py-4 bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all placeholder:text-slate-400 text-sm md:text-base font-medium"
                   />
-                  <button type="submit" disabled={!newMessage.trim()} className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:from-slate-200 disabled:to-slate-300 disabled:text-slate-400 disabled:shadow-none text-white px-5 md:px-8 py-3 md:py-4 rounded-2xl font-bold shadow-[0_4px_14px_rgba(14,165,233,0.39)] transition-all text-sm md:text-base">
+                  <button type="submit" disabled={!newMessage.trim() || uploading} className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:from-slate-200 disabled:to-slate-300 disabled:text-slate-400 disabled:shadow-none text-white px-5 md:px-8 py-3 md:py-4 rounded-2xl font-bold shadow-[0_4px_14px_rgba(14,165,233,0.39)] transition-all text-sm md:text-base">
                     Enviar
                   </button>
                 </form>

@@ -1,5 +1,5 @@
 require('dotenv').config({ path: '.env.local' });
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { createClient } = require('@supabase/supabase-js');
 const { initCronJobs } = require('./cron');
@@ -243,8 +243,15 @@ supabase.channel('acs_outbound')
                 const { data: patient } = await supabase.from('patients').select('phone_number').eq('id', session.patient_id).single();
                 if (patient) {
                     const chatId = `${patient.phone_number}@c.us`;
-                    console.log(`👨‍⚕️ Disparando resposta do ACS para ${patient.phone_number}: ${msg.content}`);
-                    await client.sendMessage(chatId, msg.content);
+                    
+                    if (msg.media_url) {
+                        console.log(`📎 Enviando arquivo do ACS para ${patient.phone_number}: ${msg.media_name}`);
+                        const media = await MessageMedia.fromUrl(msg.media_url);
+                        await client.sendMessage(chatId, media, { caption: msg.content });
+                    } else {
+                        console.log(`👨‍⚕️ Disparando resposta do ACS para ${patient.phone_number}: ${msg.content}`);
+                        await client.sendMessage(chatId, msg.content);
+                    }
                 }
             }
         } catch (err) {
