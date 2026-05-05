@@ -67,7 +67,7 @@ export default function ChatPage() {
           setMessages(prev => [...prev, payload.new]);
           scrollToBottom();
         } else if (payload.eventType === 'UPDATE') {
-          // Faz o "merge" do que mudou com o que já tínhamos para não perder campos (como sender_type)
+          console.log('🔔 Update recebido via Realtime:', payload.new);
           setMessages(prev => prev.map(msg => 
             msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
           ));
@@ -166,6 +166,13 @@ export default function ChatPage() {
   const salvarEdicao = async () => {
     if (!editingMsgId || !editValue.trim()) return;
     
+    // Atualização Otimista: Muda na tela antes mesmo de ir pro banco
+    const oldMessages = [...messages];
+    setMessages(prev => prev.map(msg => 
+      msg.id === editingMsgId ? { ...msg, content: editValue, updated_at: new Date().toISOString() } : msg
+    ));
+    setEditingMsgId(null);
+
     const { error } = await supabase.from('messages')
       .update({ 
         content: editValue, 
@@ -174,9 +181,8 @@ export default function ChatPage() {
       .eq('id', editingMsgId);
 
     if (error) {
-      alert('Erro ao salvar edição: ' + error.message);
-    } else {
-      setEditingMsgId(null);
+      alert('Erro ao salvar no banco: ' + error.message);
+      setMessages(oldMessages); // Volta ao que era se der erro
     }
   };
 
