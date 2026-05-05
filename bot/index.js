@@ -228,8 +228,8 @@ Se for perguntado sobre dados médicos, diga que você ainda está em fase de tr
     }
 });
 
-// Escuta o banco de dados por mensagens enviadas pelo ACS no painel
-supabase.channel('acs_outbound')
+// Escuta o banco de dados por ações do ACS no painel (Envio, Edição, Remoção)
+supabase.channel('acs_actions')
     .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
@@ -237,20 +237,30 @@ supabase.channel('acs_outbound')
         filter: "sender_type=eq.acs"
     }, async (payload) => {
         const msg = payload.new;
+        if (msg.whatsapp_message_id) return; // Já foi enviado/processado
+
         try {
             const { data: session } = await supabase.from('chat_sessions').select('patient_id').eq('id', msg.session_id).single();
             if (session) {
                 const { data: patient } = await supabase.from('patients').select('phone_number').eq('id', session.patient_id).single();
                 if (patient) {
                     const chatId = `${patient.phone_number}@c.us`;
+                    let sentMsg;
                     
                     if (msg.media_url) {
                         console.log(`📎 Enviando arquivo do ACS para ${patient.phone_number}: ${msg.media_name}`);
                         const media = await MessageMedia.fromUrl(msg.media_url);
-                        await client.sendMessage(chatId, media, { caption: msg.content });
+                        sentMsg = await client.sendMessage(chatId, media, { caption: msg.content });
                     } else {
                         console.log(`👨‍⚕️ Disparando resposta do ACS para ${patient.phone_number}: ${msg.content}`);
-                        await client.sendMessage(chatId, msg.content);
+                        sentMsg = await client.sendMessage(chatId, msg.content);
+                    }
+
+                    // Salva o ID do WhatsApp no banco para futuras edições/exclusões
+                    if (sentMsg && sentMsg.id && sentMsg.id._serialized) {
+                        await supabase.from('messages')
+                            .update({ whatsapp_message_id: sentMsg.id._serialized, status: 'sent' })
+                            .eq('id', msg.id);
                     }
                 }
             }
@@ -258,7 +268,53 @@ supabase.channel('acs_outbound')
             console.error("Erro ao enviar mensagem do ACS:", err);
         }
     })
+    .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: "sender_type=eq.acs"
+    }, async (payload) => {
+        const oldMsg = payload.old;
+        const newMsg = payload.new;
+        
+        if (!newMsg.whatsapp_message_id) return;
+
+        try {
+            // 1. Caso de Remoção (is_deleted: true)
+            if (newMsg.is_deleted && !oldMsg.is_deleted) {
+                console.log(`🗑️ Removendo mensagem no WhatsApp: ${newMsg.whatsapp_message_id}`);
+                const msgToPerform = await client.getMessageById(newMsg.whatsapp_message_id);
+                if (msgToPerform) await msgToPerform.delete(true); // true = deletar para todos
+                return;
+            }
+
+            // 2. Caso de Edição (content alterado)
+            if (newMsg.content !== oldMsg.content && !newMsg.is_deleted) {
+                console.log(`✏️ Editando mensagem no WhatsApp: ${newMsg.whatsapp_message_id}`);
+                const msgToPerform = await client.getMessageById(newMsg.whatsapp_message_id);
+                if (msgToPerform) await msgToPerform.edit(newMsg.content);
+                return;
+            }
+        } catch (err) {
+            console.error("Erro ao processar UPDATE no bot:", err.message);
+        }
+    })
     .subscribe();
+
+// Listener de Status da Mensagem (ACK)
+client.on('message_ack', async (msg, ack) => {
+    // ack: 0: erro, 1: enviado, 2: entregue, 3: lido
+    let status = 'sent';
+    if (ack === 2) status = 'delivered';
+    if (ack === 3) status = 'read';
+    if (ack === 0) status = 'failed';
+
+    if (msg.id && msg.id._serialized) {
+        await supabase.from('messages')
+            .update({ status })
+            .eq('whatsapp_message_id', msg.id._serialized);
+    }
+});
 
 // Inicializa
 console.log("Iniciando o cliente do WhatsApp Web...");

@@ -50,7 +50,14 @@ CREATE TABLE public.messages (
     session_id UUID REFERENCES public.chat_sessions(id) ON DELETE CASCADE NOT NULL,
     sender_type TEXT NOT NULL CHECK (sender_type IN ('patient', 'bot', 'acs')),
     content TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    whatsapp_message_id TEXT, -- ID retornado pelo WhatsApp
+    status TEXT DEFAULT 'sent' CHECK (status IN ('sent', 'delivered', 'read', 'failed')),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    media_url TEXT,
+    media_type TEXT,
+    media_name TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- =====================================================================================

@@ -55,16 +55,22 @@ export default function ChatPage() {
     }
     fetchMessages();
 
-    // Atualização em tempo real das mensagens
+    // Atualização em tempo real das mensagens (Escuta tudo: INSERT, UPDATE, DELETE)
     const msgChannel = supabase.channel(`msgs_${selectedSession.id}`)
       .on('postgres_changes', { 
-        event: 'INSERT', 
+        event: '*', 
         schema: 'public', 
         table: 'messages',
         filter: `session_id=eq.${selectedSession.id}`
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new]);
-        scrollToBottom();
+        if (payload.eventType === 'INSERT') {
+          setMessages(prev => [...prev, payload.new]);
+          scrollToBottom();
+        } else if (payload.eventType === 'UPDATE') {
+          setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg));
+        } else if (payload.eventType === 'DELETE') {
+          setMessages(prev => prev.filter(msg => msg.id === payload.old.id));
+        }
       })
       .subscribe();
 
@@ -139,6 +145,27 @@ export default function ChatPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const deletarMensagem = async (msgId: string) => {
+    if (!confirm('Tem certeza que deseja apagar esta mensagem para todos?')) return;
+    await supabase.from('messages').update({ is_deleted: true, content: '🚫 Esta mensagem foi apagada.' }).eq('id', msgId);
+  };
+
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const iniciarEdicao = (msg: any) => {
+    setEditingMsgId(msg.id);
+    setEditValue(msg.content);
+  };
+
+  const salvarEdicao = async () => {
+    if (!editingMsgId || !editValue.trim()) return;
+    await supabase.from('messages')
+      .update({ content: editValue, updated_at: new Date().toISOString() })
+      .eq('id', editingMsgId);
+    setEditingMsgId(null);
   };
 
   const prepararUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,13 +249,28 @@ export default function ChatPage() {
               {messages.map(msg => {
                 const isPatient = msg.sender_type === 'patient';
                 const isBot = msg.sender_type === 'bot';
+                const isAcs = msg.sender_type === 'acs';
+                const isEditing = editingMsgId === msg.id;
                 
                 return (
-                  <div key={msg.id} className={`flex ${isPatient ? 'justify-start' : 'justify-end'}`}>
+                  <div key={msg.id} className={`flex ${isPatient ? 'justify-start' : 'justify-end'} group`}>
                     <div className={`max-w-[85%] md:max-w-[65%] rounded-3xl p-4 md:p-5 shadow-sm relative ${isPatient ? 'bg-white text-slate-700 rounded-tl-sm border border-slate-100' : isBot ? 'bg-gradient-to-br from-teal-50 to-emerald-50 text-teal-900 rounded-tr-sm border border-teal-100/50' : 'bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-tr-sm shadow-[0_4px_14px_rgba(14,165,233,0.3)]'}`}>
+                      
+                      {/* Botões de Ação (Apenas para ACS e mensagens não apagadas) */}
+                      {isAcs && !msg.is_deleted && (
+                        <div className="absolute -left-12 top-2 hidden group-hover:flex flex-col gap-1">
+                          <button onClick={() => iniciarEdicao(msg)} className="p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-sky-500 transition-colors" title="Editar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                          </button>
+                          <button onClick={() => deletarMensagem(msg.id)} className="p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-rose-500 transition-colors" title="Apagar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                          </button>
+                        </div>
+                      )}
+
                       {!isPatient && <div className={`text-[10px] uppercase tracking-widest mb-1.5 md:mb-2 font-bold ${isBot ? 'text-teal-600' : 'text-sky-100'}`}>{isBot ? '🤖 IA Assistente' : '👨‍⚕️ Agente (ACS)'}</div>}
                       
-                      {msg.media_url ? (
+                      {msg.media_url && !msg.is_deleted ? (
                         <div className="mb-2">
                           {msg.media_type?.startsWith('image/') ? (
                             <img src={msg.media_url} alt={msg.media_name} className="rounded-xl max-w-full h-auto border border-white/20 shadow-sm" />
@@ -244,10 +286,56 @@ export default function ChatPage() {
                         </div>
                       ) : null}
 
-                      <p className="text-sm md:text-base whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                      <span className={`text-[10px] font-bold block mt-2 md:mt-3 text-right ${isPatient ? 'text-slate-400' : isBot ? 'text-teal-600/60' : 'text-blue-100'}`}>
-                        {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </span>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea 
+                            value={editValue} 
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="w-full p-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-1 focus:ring-white/50 text-sm md:text-base min-h-[80px]"
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => setEditingMsgId(null)} className="text-[10px] uppercase font-bold text-sky-100 hover:text-white">Cancelar</button>
+                            <button onClick={salvarEdicao} className="text-[10px] uppercase font-bold bg-white text-sky-600 px-3 py-1 rounded-full shadow-sm">Salvar</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className={`text-sm md:text-base whitespace-pre-wrap leading-relaxed ${msg.is_deleted ? 'italic opacity-70 font-medium' : ''}`}>
+                          {msg.content}
+                          {msg.updated_at !== msg.created_at && !msg.is_deleted && (
+                            <span className="text-[9px] ml-2 opacity-60">(editada)</span>
+                          )}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-end gap-1.5 mt-2 md:mt-3">
+                        <span className={`text-[10px] font-bold block ${isPatient ? 'text-slate-400' : isBot ? 'text-teal-600/60' : 'text-blue-100'}`}>
+                          {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </span>
+                        
+                        {/* Indicadores de Status (Checks) */}
+                        {isAcs && !msg.is_deleted && (
+                          <div className="flex items-center">
+                            {msg.status === 'failed' ? (
+                              <span className="text-rose-200" title="Falha ao enviar">⚠️</span>
+                            ) : msg.status === 'read' ? (
+                              <span className="text-sky-200 flex -space-x-1" title="Lida">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                              </span>
+                            ) : msg.status === 'delivered' ? (
+                              <span className="text-blue-100/50 flex -space-x-1" title="Entregue">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                              </span>
+                            ) : (
+                              <span className="text-blue-100/50" title="Enviada">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
