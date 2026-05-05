@@ -10,6 +10,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -90,56 +91,60 @@ export default function ChatPage() {
 
   const enviarMensagem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedSession) return;
-
-    const texto = newMessage;
-    setNewMessage(''); // Limpa o input
-
-    // O bot fará o disparo quando ver essa inserção no banco
-    await supabase.from('messages').insert({
-      session_id: selectedSession.id,
-      sender_type: 'acs',
-      content: texto
-    });
-  };
-
-  const fazerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedSession) return;
+    if ((!newMessage.trim() && !pendingFile) || !selectedSession || uploading) return;
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${selectedSession.id}/${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      let mediaData = { url: null as string | null, type: null as string | null, name: null as string | null };
 
-      // 1. Upload para o Storage
-      const { error: uploadError, data } = await supabase.storage
-        .from('chat-media')
-        .upload(filePath, file);
+      // 1. Se houver arquivo pendente, faz o upload primeiro
+      if (pendingFile) {
+        const fileExt = pendingFile.name.split('.').pop();
+        const fileName = `${selectedSession.id}/${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from('chat-media')
+          .upload(filePath, pendingFile);
 
-      // 2. Pegar URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-media')
-        .getPublicUrl(filePath);
+        if (uploadError) throw uploadError;
 
-      // 3. Salvar mensagem no banco com a URL da mídia
-      await supabase.from('messages').insert({
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat-media')
+          .getPublicUrl(filePath);
+        
+        mediaData = { url: publicUrl, type: pendingFile.type, name: pendingFile.name };
+      }
+
+      // 2. Salva a mensagem no banco (com ou sem mídia)
+      const texto = newMessage.trim() || (pendingFile ? `Arquivo: ${pendingFile.name}` : '');
+      
+      const { error: insertError } = await supabase.from('messages').insert({
         session_id: selectedSession.id,
         sender_type: 'acs',
-        content: `Arquivo enviado: ${file.name}`,
-        media_url: publicUrl,
-        media_type: file.type,
-        media_name: file.name
+        content: texto,
+        media_url: mediaData.url,
+        media_type: mediaData.type,
+        media_name: mediaData.name
       });
 
+      if (insertError) throw insertError;
+
+      setNewMessage('');
+      setPendingFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
     } catch (error: any) {
-      alert('Erro ao enviar arquivo: ' + error.message);
+      alert('Erro ao enviar: ' + error.message);
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const prepararUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPendingFile(file);
     }
   };
 
@@ -253,34 +258,53 @@ export default function ChatPage() {
             {/* Input de Mensagem */}
             {selectedSession.status === 'escalated' ? (
               <div className="p-4 md:p-6 bg-white border-t border-slate-50">
+                {pendingFile && (
+                  <div className="mb-4 flex items-center justify-between bg-teal-50 p-3 rounded-2xl border border-teal-100">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📎</span>
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-bold text-teal-800 truncate max-w-[200px]">{pendingFile.name}</p>
+                        <p className="text-[10px] text-teal-600 uppercase font-bold">Aguardando envio...</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setPendingFile(null)} className="text-teal-400 hover:text-rose-500 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
+                )}
                 <form onSubmit={enviarMensagem} className="flex gap-2 md:gap-3 items-center">
                   <input 
                     type="file" 
                     className="hidden" 
                     ref={fileInputRef} 
-                    onChange={fazerUpload}
+                    onChange={prepararUpload}
                   />
                   <button 
                     type="button" 
                     disabled={uploading}
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-3 md:p-4 bg-slate-50 text-slate-400 hover:text-sky-500 hover:bg-sky-50 rounded-2xl transition-all border border-slate-200"
+                    className={`p-3 md:p-4 rounded-2xl transition-all border ${pendingFile ? 'bg-teal-500 text-white border-teal-500 shadow-lg' : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-sky-500 hover:bg-sky-50'}`}
                   >
-                    {uploading ? (
-                      <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                    )}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
                   </button>
                   <input 
                     type="text" 
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Digite sua mensagem..." 
-                    className="flex-1 px-4 md:px-6 py-3 md:py-4 bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all placeholder:text-slate-400 text-sm md:text-base font-medium"
+                    className="flex-1 px-4 md:px-6 py-3 md:py-4 bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all placeholder:text-slate-400 text-sm md:text-base font-medium"
                   />
-                  <button type="submit" disabled={!newMessage.trim() || uploading} className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:from-slate-200 disabled:to-slate-300 disabled:text-slate-400 disabled:shadow-none text-white px-5 md:px-8 py-3 md:py-4 rounded-2xl font-bold shadow-[0_4px_14px_rgba(14,165,233,0.39)] transition-all text-sm md:text-base">
-                    Enviar
+                  <button 
+                    type="submit" 
+                    disabled={(!newMessage.trim() && !pendingFile) || uploading} 
+                    className={`px-5 md:px-8 py-3 md:py-4 rounded-2xl font-bold transition-all text-sm md:text-base shadow-lg disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none ${(!newMessage.trim() && !pendingFile) ? 'bg-slate-200' : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200'}`}
+                  >
+                    {uploading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Enviando...
+                      </div>
+                    ) : 'Enviar'}
                   </button>
                 </form>
               </div>
