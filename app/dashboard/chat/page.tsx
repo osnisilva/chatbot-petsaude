@@ -101,10 +101,12 @@ export default function ChatPage() {
     });
   };
 
-  return (
-    <div className="flex h-full bg-[#F4F7F9] p-6 gap-6">
+    <div className="flex h-full bg-[#F4F7F9] p-4 md:p-6 gap-4 md:gap-6 relative overflow-hidden">
       {/* Lista de Contatos */}
-      <div className="w-96 rounded-3xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden">
+      <div className={`
+        ${selectedSession ? 'hidden md:flex' : 'flex'} 
+        w-full md:w-96 rounded-3xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden transition-all duration-300
+      `}>
         <div className="p-6 border-b border-slate-50 bg-white">
           <h2 className="font-extrabold text-xl text-slate-800 tracking-tight">Atendimentos</h2>
           <p className="text-sm text-slate-500 mt-1">Sessões ativas no momento</p>
@@ -129,18 +131,27 @@ export default function ChatPage() {
       </div>
 
       {/* Área do Chat */}
-      <div className="flex-1 rounded-3xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden relative">
+      <div className={`
+        ${!selectedSession ? 'hidden md:flex' : 'flex'} 
+        flex-1 rounded-3xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden relative transition-all duration-300
+      `}>
         {selectedSession ? (
           <>
             {/* Header do Chat */}
-            <div className="p-6 bg-white border-b border-slate-50 flex justify-between items-center z-10 relative">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-lg">
+            <div className="p-4 md:p-6 bg-white border-b border-slate-50 flex justify-between items-center z-10 relative">
+              <div className="flex items-center gap-3 md:gap-4">
+                <button 
+                  onClick={() => setSelectedSession(null)}
+                  className="md:hidden p-2 -ml-2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                </button>
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-base md:text-lg">
                   {(selectedSession.patients as any)?.name?.charAt(0)}
                 </div>
                 <div>
-                  <h2 className="font-extrabold text-lg text-slate-800">{(selectedSession.patients as any)?.name}</h2>
-                  <p className="text-sm text-slate-500 font-medium">{selectedSession.patients?.phone_number}</p>
+                  <h2 className="font-extrabold text-base md:text-lg text-slate-800 truncate max-w-[150px] sm:max-w-xs">{(selectedSession.patients as any)?.name}</h2>
+                  <p className="text-xs md:sm text-slate-500 font-medium">{selectedSession.patients?.phone_number}</p>
                 </div>
               </div>
               <div className="space-x-3">
@@ -159,17 +170,17 @@ export default function ChatPage() {
             </div>
 
             {/* Balões de Mensagem */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/50 relative">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 md:space-y-6 bg-slate-50/50 relative">
               {messages.map(msg => {
                 const isPatient = msg.sender_type === 'patient';
                 const isBot = msg.sender_type === 'bot';
                 
                 return (
                   <div key={msg.id} className={`flex ${isPatient ? 'justify-start' : 'justify-end'}`}>
-                    <div className={`max-w-[65%] rounded-3xl p-5 shadow-sm relative ${isPatient ? 'bg-white text-slate-700 rounded-tl-sm border border-slate-100' : isBot ? 'bg-gradient-to-br from-teal-50 to-emerald-50 text-teal-900 rounded-tr-sm border border-teal-100/50' : 'bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-tr-sm shadow-[0_4px_14px_rgba(14,165,233,0.3)]'}`}>
-                      {!isPatient && <div className={`text-[10px] uppercase tracking-widest mb-2 font-bold ${isBot ? 'text-teal-600' : 'text-sky-100'}`}>{isBot ? '🤖 IA Assistente' : '👨‍⚕️ Agente (ACS)'}</div>}
-                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                      <span className={`text-[10px] font-bold block mt-3 text-right ${isPatient ? 'text-slate-400' : isBot ? 'text-teal-600/60' : 'text-blue-100'}`}>
+                    <div className={`max-w-[85%] md:max-w-[65%] rounded-3xl p-4 md:p-5 shadow-sm relative ${isPatient ? 'bg-white text-slate-700 rounded-tl-sm border border-slate-100' : isBot ? 'bg-gradient-to-br from-teal-50 to-emerald-50 text-teal-900 rounded-tr-sm border border-teal-100/50' : 'bg-gradient-to-br from-sky-500 to-blue-600 text-white rounded-tr-sm shadow-[0_4px_14px_rgba(14,165,233,0.3)]'}`}>
+                      {!isPatient && <div className={`text-[10px] uppercase tracking-widest mb-1.5 md:mb-2 font-bold ${isBot ? 'text-teal-600' : 'text-sky-100'}`}>{isBot ? '🤖 IA Assistente' : '👨‍⚕️ Agente (ACS)'}</div>}
+                      <p className="text-sm md:text-base whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      <span className={`text-[10px] font-bold block mt-2 md:mt-3 text-right ${isPatient ? 'text-slate-400' : isBot ? 'text-teal-600/60' : 'text-blue-100'}`}>
                         {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </span>
                     </div>
@@ -181,16 +192,16 @@ export default function ChatPage() {
 
             {/* Input de Mensagem */}
             {selectedSession.status === 'escalated' ? (
-              <div className="p-6 bg-white border-t border-slate-50">
-                <form onSubmit={enviarMensagem} className="flex gap-3">
+              <div className="p-4 md:p-6 bg-white border-t border-slate-50">
+                <form onSubmit={enviarMensagem} className="flex gap-2 md:gap-3">
                   <input 
                     type="text" 
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Digite sua mensagem para o paciente..." 
-                    className="flex-1 px-6 py-4 bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all placeholder:text-slate-400 font-medium"
+                    placeholder="Digite sua mensagem..." 
+                    className="flex-1 px-4 md:px-6 py-3 md:py-4 bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all placeholder:text-slate-400 text-sm md:text-base font-medium"
                   />
-                  <button type="submit" disabled={!newMessage.trim()} className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:from-slate-200 disabled:to-slate-300 disabled:text-slate-400 disabled:shadow-none text-white px-8 py-4 rounded-2xl font-bold shadow-[0_4px_14px_rgba(14,165,233,0.39)] transition-all">
+                  <button type="submit" disabled={!newMessage.trim()} className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:from-slate-200 disabled:to-slate-300 disabled:text-slate-400 disabled:shadow-none text-white px-5 md:px-8 py-3 md:py-4 rounded-2xl font-bold shadow-[0_4px_14px_rgba(14,165,233,0.39)] transition-all text-sm md:text-base">
                     Enviar
                   </button>
                 </form>

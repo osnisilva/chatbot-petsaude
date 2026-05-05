@@ -63,17 +63,17 @@ export default async function DashboardPage() {
   const isBotOnline = lastBotMsg ? (new Date().getTime() - new Date(lastBotMsg.created_at).getTime() < 7200000) : false;
 
   return (
-    <div className="p-10 h-full overflow-auto bg-[#F4F7F9]">
+    <div className="p-4 md:p-10 h-full overflow-auto bg-[#F4F7F9]">
       {/* Header com Status do Sistema */}
-      <div className="flex justify-between items-start mb-10">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8 md:mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-slate-800 tracking-tight">Visão Geral</h1>
-          <p className="text-slate-500 mt-2 text-lg">Monitoramento em tempo real da rede de saúde.</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">Visão Geral</h1>
+          <p className="text-slate-500 mt-2 text-base md:text-lg">Monitoramento em tempo real da rede de saúde.</p>
         </div>
-        <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100">
-            <div className={`w-3 h-3 rounded-full ${isBotOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+        <div className="flex items-center gap-3 bg-white px-4 md:px-5 py-2 md:py-3 rounded-2xl shadow-sm border border-slate-100 w-full md:w-auto">
+            <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isBotOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
             <span className="text-sm font-bold text-slate-700">
-                Status do Bot: {isBotOnline ? 'OPERACIONAL' : 'OFFLINE / AGUARDANDO'}
+                Status do Bot: {isBotOnline ? 'OPERACIONAL' : 'OFFLINE'}
             </span>
         </div>
       </div>
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
                 <h3 className="text-xl font-extrabold text-slate-800 mb-4 flex items-center gap-2">
                     ⚖️ Conformidade LGPD
                 </h3>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-col sm:flex-row items-center gap-6">
                     <div className="flex-1 space-y-3">
                         <div className="flex justify-between items-center text-xs font-bold">
                             <span className="text-emerald-600">ACEITO</span>

@@ -28,13 +28,13 @@ export default function PacientesPage() {
   }, []);
 
   return (
-    <div className="p-10 h-full overflow-auto">
-      <div className="flex justify-between items-center mb-10">
+    <div className="p-4 md:p-10 h-full overflow-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 md:mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-slate-800 tracking-tight">Pacientes</h1>
-          <p className="text-slate-500 mt-2 text-lg">Base de dados unificada do e-SUS</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">Pacientes</h1>
+          <p className="text-slate-500 mt-2 text-base md:text-lg">Base de dados unificada do e-SUS</p>
         </div>
-        <button className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-[0_4px_14px_rgba(20,184,166,0.39)] transition-all hover:shadow-[0_6px_20px_rgba(20,184,166,0.5)] flex items-center gap-2">
+        <button className="w-full md:w-auto bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-[0_4px_14px_rgba(20,184,166,0.39)] transition-all hover:shadow-[0_6px_20px_rgba(20,184,166,0.5)] flex items-center justify-center gap-2">
           <span className="text-xl leading-none">+</span> Novo Paciente
         </button>
       </div>

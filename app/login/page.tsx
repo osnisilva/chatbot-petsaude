@@ -32,9 +32,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-[#F4F7F9]">
-      <div className="bg-white p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 max-w-sm w-full relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-bl-full -z-10"></div>
+    <div className="flex min-h-screen items-center justify-center bg-[#F4F7F9] p-4">
+      <div className="bg-white p-6 md:p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 max-w-sm w-full relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 bg-teal-50 rounded-bl-full -z-10"></div>
         
         <div className="flex flex-col items-center mb-8">
           <img
