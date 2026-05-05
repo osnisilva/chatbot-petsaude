@@ -101,6 +101,7 @@ export default function ChatPage() {
     });
   };
 
+  return (
     <div className="flex h-full bg-[#F4F7F9] p-4 md:p-6 gap-4 md:gap-6 relative overflow-hidden">
       {/* Lista de Contatos */}
       <div className={`
