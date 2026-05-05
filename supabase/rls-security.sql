@@ -84,3 +84,13 @@ CREATE POLICY "acs_can_insert_messages" ON public.messages
         )
         AND sender_type = 'acs'
     );
+
+DROP POLICY IF EXISTS "acs_can_update_messages" ON public.messages;
+CREATE POLICY "acs_can_update_messages" ON public.messages
+    FOR UPDATE USING (
+        session_id IN (
+            SELECT id FROM public.chat_sessions 
+            WHERE is_admin() OR patient_id IN (SELECT id FROM public.patients WHERE acs_id = get_user_acs_id())
+        )
+        AND sender_type = 'acs'
+    );
