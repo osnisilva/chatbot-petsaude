@@ -7,11 +7,12 @@ import AddTrailModal from './AddTrailModal';
 interface PatientCardProps {
   patientId: string;
   patientName: string;
+  ubsName: string;
   campaigns: any[];
   templates: any[];
 }
 
-export default function PatientCard({ patientId, patientName, campaigns, templates }: PatientCardProps) {
+export default function PatientCard({ patientId, patientName, ubsName, campaigns, templates }: PatientCardProps) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -19,7 +20,11 @@ export default function PatientCard({ patientId, patientName, campaigns, templat
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="font-bold text-lg text-slate-800">{patientName}</h3>
-          <p className="text-xs text-slate-400 font-mono">ID: {patientId.substring(0, 8)}...</p>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ubsName}</span>
+            <span className="text-slate-200">•</span>
+            <p className="text-[10px] text-slate-300 font-mono">ID: {patientId.substring(0, 8)}...</p>
+          </div>
         </div>
         <button 
           onClick={() => setShowModal(true)}

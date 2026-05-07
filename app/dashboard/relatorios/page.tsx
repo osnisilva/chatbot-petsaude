@@ -14,8 +14,24 @@ export default function RelatoriosPage() {
   const [ubsList, setUbsList] = useState<any[]>([]);
   const [selectedUbs, setSelectedUbs] = useState<string>('');
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
   useEffect(() => {
     async function fetchFilterData() {
+      // 1. Verificar permissões
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('acs')
+          .select('role, ubs:ubs_id(name)')
+          .eq('auth_user_id', user.id)
+          .single();
+        
+        const isSecretaria = (profile?.ubs as any)?.name === 'Secretaria de Saúde';
+        setIsAdmin(profile?.role === 'admin_ti' || isSecretaria);
+      }
+
+      // 2. Buscar Lista de UBS
       const { data: ubs } = await supabase.from('ubs').select('id, name').order('name');
       if (ubs) setUbsList(ubs);
     }
@@ -55,10 +71,11 @@ export default function RelatoriosPage() {
           <select 
             value={selectedUbs}
             onChange={(e) => setSelectedUbs(e.target.value)}
-            className="w-full md:w-64 px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+            disabled={!isAdmin}
+            className="w-full md:w-64 px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500 transition-all disabled:bg-slate-50 disabled:text-slate-400"
           >
-            <option value="">Todas as Unidades</option>
-            {ubsList.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            <option value="">{isAdmin ? 'Todas as Unidades' : 'Minha Unidade'}</option>
+            {isAdmin && ubsList.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
       </div>

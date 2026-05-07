@@ -17,12 +17,13 @@ export default async function DashboardPage({
 
   const { data: profile } = await supabase
     .from('acs')
-    .select('role, ubs_id')
+    .select('role, ubs_id, ubs:ubs_id(name)')
     .eq('auth_user_id', session.user.id)
     .single();
 
-  const isAdmin = profile?.role === 'admin_ti';
-  const isManager = profile?.role === 'gerente';
+  const isSecretaria = (profile?.ubs as any)?.name === 'Secretaria de Saúde';
+  const isAdmin = profile?.role === 'admin_ti' || isSecretaria;
+  const isManager = profile?.role === 'gerente' && !isSecretaria;
   
   // Definir qual UBS filtrar
   // Se for manager, sempre usa a dele. Se for admin, usa o param ou null (todos).
@@ -195,7 +196,7 @@ export default async function DashboardPage({
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">Visão Geral</h1>
           <div className="flex items-center gap-3">
              <p className="text-slate-500 text-base md:text-lg">Monitoramento em tempo real.</p>
-             {isAdmin && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Modo Secretaria</span>}
+             {isAdmin && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Gestor Central</span>}
              {isManager && <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Gestão Local</span>}
           </div>
         </div>
