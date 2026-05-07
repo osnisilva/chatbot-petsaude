@@ -9,19 +9,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'IDs do profissional e auth são obrigatórios' }, { status: 400 });
     }
 
-    // Criar cliente admin (Service Role)
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+        auth: { autoRefreshToken: false, persistSession: false }
       }
     );
 
-    // 1. Atualizar dados no sistema de Autenticação (Auth)
+    // 1. Atualizar Auth (E-mail e Senha)
     const authUpdateData: any = {};
     if (email) authUpdateData.email = email;
     if (password) authUpdateData.password = password;
@@ -34,11 +30,12 @@ export async function POST(request: Request) {
       if (authError) throw authError;
     }
 
-    // 2. Atualizar dados na tabela 'acs' (Banco de Dados)
+    // 2. Atualizar Banco (Tabela acs) - AGORA COM EMAIL!
     const { error: dbError } = await supabaseAdmin
       .from('acs')
       .update({
         name,
+        email, // <-- Faltava este campo aqui!
         role,
         ubs_id,
         microarea,
