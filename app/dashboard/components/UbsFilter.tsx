@@ -1,0 +1,53 @@
+"use client";
+
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+
+interface UbsFilterProps {
+  ubsList: { id: string, name: string }[];
+  currentUbsId: string | null;
+  disabled?: boolean;
+}
+
+export default function UbsFilter({ ubsList, currentUbsId, disabled }: UbsFilterProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const handleUbsChange = (id: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) {
+      params.set('ubs', id);
+    } else {
+      params.delete('ubs');
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <div className="relative w-full sm:w-64">
+      <select
+        disabled={disabled}
+        value={currentUbsId || ''}
+        onChange={(e) => handleUbsChange(e.target.value)}
+        className={`
+          w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm 
+          text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500 
+          appearance-none cursor-pointer transition-all
+          ${disabled ? 'opacity-70 bg-slate-50 cursor-not-allowed' : 'hover:border-teal-200'}
+        `}
+      >
+        <option value="">{disabled ? 'Sua Unidade' : 'Todas as Unidades (Total)'}</option>
+        {ubsList.map((ubs) => (
+          <option key={ubs.id} value={ubs.id}>
+            {ubs.name}
+          </option>
+        ))}
+      </select>
+      
+      {/* Custom arrow for the select */}
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+  );
+}

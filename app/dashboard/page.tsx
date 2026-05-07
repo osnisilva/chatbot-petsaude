@@ -1,30 +1,94 @@
 import { createClient } from '@/utils/supabase/server';
+import { redirect } from 'next/navigation';
+import UbsFilter from './components/UbsFilter';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ubs?: string }>;
+}) {
   const supabase = await createClient();
+  const { ubs: ubsParam } = await searchParams;
+
+  // 1. Identificar usuário e permissões
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) redirect('/login');
+
+  const { data: profile } = await supabase
+    .from('acs')
+    .select('role, ubs_id')
+    .eq('auth_user_id', session.user.id)
+    .single();
+
+  const isAdmin = profile?.role === 'admin_ti';
+  const isManager = profile?.role === 'gerente';
+  
+  // Definir qual UBS filtrar
+  // Se for manager, sempre usa a dele. Se for admin, usa o param ou null (todos).
+  let selectedUbsId = isManager ? profile.ubs_id : (ubsParam || null);
+
+  // 2. Buscar Lista de UBS (apenas para Admin)
+  let ubsList: any[] = [];
+  if (isAdmin) {
+    const { data } = await supabase.from('ubs').select('id, name').order('name');
+    ubsList = data || [];
+  }
+
+  // --- QUERIES COM FILTRO ---
+  
+  // Helper para aplicar filtro de UBS
+  const applyFilter = (query: any) => {
+    if (selectedUbsId) {
+      return query.eq('ubs_id', selectedUbsId);
+    }
+    return query;
+  };
 
   // 1. Total de Pacientes
-  const { count: totalPatients } = await supabase
-    .from('patients')
-    .select('*', { count: 'exact', head: true });
+  const { count: totalPatients } = await applyFilter(
+    supabase.from('patients').select('*', { count: 'exact', head: true })
+  );
 
   // 2. Atendimentos IA (mensagens do bot hoje)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const { count: messagesToday } = await supabase
+  
+  // Nota: messages não tem ubs_id direto, precisamos filtrar por patient_id -> ubs_id
+  // Ou usar a política de RLS que já cuida disso se o selectedUbsId for injetado.
+  // Como estamos no server, vamos fazer um join simples ou subquery se necessário.
+  let messagesQuery = supabase
     .from('messages')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('sender_type', 'bot')
     .gte('created_at', today.toISOString());
+  
+  if (selectedUbsId) {
+    messagesQuery = messagesQuery.filter('session_id', 'in', 
+        supabase.from('chat_sessions').select('id').filter('patient_id', 'in', 
+            supabase.from('patients').select('id').eq('ubs_id', selectedUbsId)
+        )
+    );
+  }
+  const { count: messagesToday } = await messagesQuery;
 
   // 3. Aguardando ACS (Transbordos)
-  const { count: waitingAcs } = await supabase
+  let waitingQuery = supabase
     .from('chat_sessions')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'escalated');
+  
+  if (selectedUbsId) {
+    waitingQuery = waitingQuery.filter('patient_id', 'in', 
+        supabase.from('patients').select('id').eq('ubs_id', selectedUbsId)
+    );
+  }
+  const { count: waitingAcs } = await waitingQuery;
 
   // 4. LGPD Stats
-  const { data: lgpdData } = await supabase.from('patients').select('lgpd_consent');
+  let lgpdQuery = supabase.from('patients').select('lgpd_consent');
+  if (selectedUbsId) lgpdQuery = lgpdQuery.eq('ubs_id', selectedUbsId);
+  const { data: lgpdData } = await lgpdQuery;
+  
   const lgpd = {
     aceito: lgpdData?.filter(p => p.lgpd_consent === true).length || 0,
     recusado: lgpdData?.filter(p => p.lgpd_consent === false).length || 0,
@@ -32,11 +96,14 @@ export default async function DashboardPage() {
     total: lgpdData?.length || 0
   };
 
-  // 5. Comorbidades (Agregação simples)
-  const { data: comorbData } = await supabase.from('patients').select('comorbidities');
+  // 5. Comorbidades
+  let comorbQuery = supabase.from('patients').select('comorbidities');
+  if (selectedUbsId) comorbQuery = comorbQuery.eq('ubs_id', selectedUbsId);
+  const { data: comorbData } = await comorbQuery;
+  
   const comorbMap: Record<string, number> = {};
   comorbData?.forEach(p => {
-    p.comorbidities?.forEach((c: string) => {
+    (p.comorbidities as string[] | null)?.forEach((c: string) => {
       comorbMap[c] = (comorbMap[c] || 0) + 1;
     });
   });
@@ -45,11 +112,18 @@ export default async function DashboardPage() {
     .slice(0, 5);
 
   // 6. Agendamentos de Hoje
-  const { count: scheduledToday } = await supabase
+  let scheduledQuery = supabase
     .from('scheduled_messages')
     .select('*', { count: 'exact', head: true })
     .gte('next_run_at', today.toISOString())
     .lt('next_run_at', new Date(today.getTime() + 86400000).toISOString());
+  
+  if (selectedUbsId) {
+    scheduledQuery = scheduledQuery.filter('patient_id', 'in', 
+        supabase.from('patients').select('id').eq('ubs_id', selectedUbsId)
+    );
+  }
+  const { count: scheduledToday } = await scheduledQuery;
 
   // 7. Status do Bot (Última atividade)
   const { data: lastBotMsg } = await supabase
@@ -64,17 +138,31 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-10 h-full overflow-auto bg-[#F4F7F9]">
-      {/* Header com Status do Sistema */}
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8 md:mb-10">
-        <div>
+      {/* Header com Filtro e Status */}
+      <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-10">
+        <div className="space-y-2">
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">Visão Geral</h1>
-          <p className="text-slate-500 mt-2 text-base md:text-lg">Monitoramento em tempo real da rede de saúde.</p>
+          <div className="flex items-center gap-3">
+             <p className="text-slate-500 text-base md:text-lg">Monitoramento em tempo real.</p>
+             {isAdmin && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Modo Secretaria</span>}
+             {isManager && <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Gestão Local</span>}
+          </div>
         </div>
-        <div className="flex items-center gap-3 bg-white px-4 md:px-5 py-2 md:py-3 rounded-2xl shadow-sm border border-slate-100 w-full md:w-auto">
-            <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isBotOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
-            <span className="text-sm font-bold text-slate-700">
-                Status do Bot: {isBotOnline ? 'OPERACIONAL' : 'OFFLINE'}
-            </span>
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+            {/* Componente de Filtro */}
+            <UbsFilter 
+                ubsList={ubsList} 
+                currentUbsId={selectedUbsId} 
+                disabled={!isAdmin} 
+            />
+
+            <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 w-full sm:w-auto">
+                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isBotOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                <span className="text-sm font-bold text-slate-700 whitespace-nowrap">
+                    Bot: {isBotOnline ? 'OPERACIONAL' : 'OFFLINE'}
+                </span>
+            </div>
         </div>
       </div>
       
@@ -100,7 +188,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group">
+        <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
           <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2">Aguardando ACS</h3>
           <p className="text-5xl font-black text-slate-800">{waitingAcs || 0}</p>
@@ -134,12 +222,14 @@ export default async function DashboardPage() {
                         </div>
                     </div>
                 )) : (
-                    <p className="text-slate-400 text-center py-10">Nenhum dado de comorbidade disponível.</p>
+                    <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                        <span className="text-4xl mb-2">📊</span>
+                        <p className="font-medium">Nenhum dado disponível nesta unidade.</p>
+                    </div>
                 )}
             </div>
         </div>
 
-        {/* Painel LGPD e Agendamentos */}
         <div className="space-y-6">
             {/* LGPD */}
             <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
@@ -185,11 +275,11 @@ export default async function DashboardPage() {
             <div className="bg-gradient-to-br from-teal-600 to-emerald-700 p-8 rounded-3xl shadow-lg text-white relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl">📅</div>
                 <h3 className="text-xl font-bold mb-2">Trilhas de Cuidado</h3>
-                <p className="text-teal-100 mb-6 text-sm">Mensagens automáticas programadas para hoje.</p>
+                <p className="text-teal-100 mb-6 text-sm">Mensagens automáticas programadas.</p>
                 <div className="flex items-end justify-between">
                     <div>
                         <p className="text-5xl font-black">{scheduledToday || 0}</p>
-                        <p className="text-xs font-bold text-teal-100 mt-2 uppercase tracking-widest">Disparos Agendados</p>
+                        <p className="text-xs font-bold text-teal-100 mt-2 uppercase tracking-widest">Disparos Hoje</p>
                     </div>
                     <a href="/dashboard/agendamentos" className="bg-white/10 hover:bg-white/20 transition-colors px-4 py-2 rounded-xl text-xs font-bold border border-white/20">
                         Ver detalhes →
