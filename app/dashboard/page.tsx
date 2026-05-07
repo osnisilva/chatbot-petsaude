@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import UbsFilter from './components/UbsFilter';
+import EngagementTable from './components/EngagementTable';
 
 export default async function DashboardPage({
   searchParams,
@@ -135,6 +136,42 @@ export default async function DashboardPage({
     .maybeSingle();
 
   const isBotOnline = lastBotMsg ? (new Date().getTime() - new Date(lastBotMsg.created_at).getTime() < 7200000) : false;
+
+  // 8. Dados de Engajamento por ACS (Apenas para Gestores)
+  let engagementData: any[] = [];
+  if (isAdmin || isManager) {
+    let patientAcsQuery = supabase
+      .from('patients')
+      .select('id, acs:acs_id(id, name, ubs:ubs_id(name))')
+      .not('acs_id', 'is', null);
+
+    if (selectedUbsId) patientAcsQuery = patientAcsQuery.eq('ubs_id', selectedUbsId);
+
+    // Filtrar apenas pacientes que tiveram interação com Bot
+    patientAcsQuery = patientAcsQuery.filter('id', 'in', 
+      supabase.from('chat_sessions').select('patient_id').filter('id', 'in', 
+          supabase.from('messages').select('session_id').eq('sender_type', 'bot')
+      )
+    );
+
+    const { data: patientsWithBot } = await patientAcsQuery;
+    
+    const engagementMap: Record<string, any> = {};
+    patientsWithBot?.forEach(p => {
+      if (!p.acs) return;
+      const acs = (p.acs as any);
+      if (!engagementMap[acs.id]) {
+        engagementMap[acs.id] = {
+          acs_id: acs.id,
+          acs_name: acs.name,
+          ubs_name: acs.ubs?.name || '-',
+          bot_patients_count: 0
+        };
+      }
+      engagementMap[acs.id].bot_patients_count++;
+    });
+    engagementData = Object.values(engagementMap).sort((a, b) => b.bot_patients_count - a.bot_patients_count);
+  }
 
   return (
     <div className="p-4 md:p-10 h-full overflow-auto bg-[#F4F7F9]">
@@ -288,6 +325,16 @@ export default async function DashboardPage({
             </div>
         </div>
       </div>
+
+      {/* Painel de Engajamento por Profissional (Apenas Admin/Gerente) */}
+      {(isAdmin || isManager) && (
+        <div className="mt-10">
+          <EngagementTable 
+            data={engagementData} 
+            totalPatients={totalPatients || 0} 
+          />
+        </div>
+      )}
     </div>
   );
 }
