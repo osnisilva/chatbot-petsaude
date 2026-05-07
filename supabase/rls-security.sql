@@ -23,10 +23,7 @@ $$ LANGUAGE sql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.acs 
-    WHERE auth_user_id = auth.uid() AND role = 'admin_ti'
-  );
+  SELECT (role = 'admin_ti') FROM public.acs WHERE auth_user_id = auth.uid() LIMIT 1;
 $$ LANGUAGE sql SECURITY DEFINER;
 
 -- 4. Função Helper: Verificar se o usuário é Gerente da UBS
@@ -50,7 +47,7 @@ CREATE POLICY "Todos logados podem ver UBS" ON public.ubs
 -- ACS: Pode ver seu próprio perfil ou, se for admin, pode ver todos
 DROP POLICY IF EXISTS "ACS vê a si mesmo ou Admin vê todos" ON public.acs;
 CREATE POLICY "ACS vê a si mesmo ou Admin vê todos" ON public.acs
-    FOR SELECT USING (auth_user_id = auth.uid() OR is_admin());
+    FOR SELECT USING (auth_user_id = auth.uid() OR (SELECT role FROM public.acs WHERE auth_user_id = auth.uid()) = 'admin_ti');
 
 -- PACIENTES: ACS só vê seus pacientes. Gerente vê todos da UBS. Admin vê todos.
 DROP POLICY IF EXISTS "acs_can_read_own_patients_or_admin" ON public.patients;

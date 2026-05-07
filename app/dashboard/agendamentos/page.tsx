@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 
 export default async function AgendamentosPage() {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user: session } } = await supabase.auth.getUser();
   
   if (!session) return null;
 
@@ -11,16 +11,15 @@ export default async function AgendamentosPage() {
   const { data: acs } = await supabase
     .from('acs')
     .select('id, ubs_id, ubs:ubs_id(name)')
-    .eq('auth_user_id', session.user.id)
+    .eq('auth_user_id', session.id)
     .single();
 
   const isSecretaria = (acs?.ubs as any)?.name === 'Secretaria de Saúde';
 
   // 2. Buscar Pacientes elegíveis (Aqueles que têm comorbidades registradas)
-  // Se for secretaria, vê todos com comorbidade. Se for ACS comum, só da sua UBS.
   let patientsQuery = supabase.from('patients').select('id, name, phone_number, comorbidities');
   
-  if (!isSecretaria && acs) {
+  if (!isSecretaria && acs?.ubs_id) {
     patientsQuery = patientsQuery.eq('ubs_id', acs.ubs_id);
   }
   
@@ -39,7 +38,7 @@ export default async function AgendamentosPage() {
     `)
     .order('next_run_at', { ascending: true });
 
-  if (!isSecretaria && acs) {
+  if (!isSecretaria && acs?.id) {
     schedulesQuery = schedulesQuery.eq('acs_id', acs.id);
   }
 
@@ -50,27 +49,36 @@ export default async function AgendamentosPage() {
   // -----------------------------------------------------
   async function createSchedule(formData: FormData) {
     "use server";
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
 
-    const acsProfile = await supabase.from('acs').select('id').eq('auth_user_id', session.user.id).single();
+      const acsProfile = await supabase.from('acs').select('id').eq('auth_user_id', user.id).single();
+      if (!acsProfile.data) throw new Error("Perfil ACS não encontrado");
 
-    const patient_id = formData.get('patient_id');
-    const template_id = formData.get('template_id');
-    const frequency = formData.get('frequency');
-    const next_run_at = new Date().toISOString(); // Começa agendado pra agora/hoje
+      const patient_id = formData.get('patient_id');
+      const template_id = formData.get('template_id');
+      const frequency = formData.get('frequency');
+      const next_run_at = new Date().toISOString();
 
-    await supabase.from('scheduled_messages').insert({
-      acs_id: acsProfile.data?.id,
-      patient_id,
-      template_id,
-      frequency,
-      next_run_at,
-      status: 'active'
-    });
+      const { error } = await supabase.from('scheduled_messages').insert({
+        acs_id: acsProfile.data.id,
+        patient_id,
+        template_id,
+        frequency,
+        next_run_at,
+        status: 'active'
+      });
 
-    revalidatePath('/dashboard/agendamentos');
+      if (error) throw error;
+      
+      revalidatePath('/dashboard/agendamentos');
+    } catch (err: any) {
+      console.error('Erro ao criar agendamento:', err.message);
+      // Como é Server Action em RSC, o log vai para o terminal do servidor.
+      // Em uma aplicação real, poderíamos usar useFormState para mostrar o erro na UI.
+    }
   }
 
   // -----------------------------------------------------
@@ -78,12 +86,19 @@ export default async function AgendamentosPage() {
   // -----------------------------------------------------
   async function deleteSchedule(formData: FormData) {
     "use server";
-    const supabase = await createClient();
-    const id = formData.get('schedule_id');
-    if (!id) return;
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
 
-    await supabase.from('scheduled_messages').delete().eq('id', id);
-    revalidatePath('/dashboard/agendamentos');
+      const id = formData.get('schedule_id');
+      if (!id) return;
+
+      await supabase.from('scheduled_messages').delete().eq('id', id);
+      revalidatePath('/dashboard/agendamentos');
+    } catch (err: any) {
+      console.error('Erro ao excluir agendamento:', err.message);
+    }
   }
 
   return (
