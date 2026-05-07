@@ -7,11 +7,12 @@ import { useEffect } from 'react';
 interface SidebarProps {
   userName: string;
   unitName: string;
+  userRole: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function Sidebar({ userName, unitName, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ userName, unitName, userRole, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   // Fechar sidebar ao mudar de rota em dispositivos móveis
@@ -78,6 +79,15 @@ export default function Sidebar({ userName, unitName, isOpen, onClose }: Sidebar
           <SidebarLink href="/dashboard/agendamentos" active={pathname.startsWith('/dashboard/agendamentos')} variant="emerald">
             📅 Agendamentos (ACS)
           </SidebarLink>
+
+          {(userRole === 'admin_ti' || userRole === 'gerente') && (
+            <>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 mt-6 mb-2">Administração</div>
+              <SidebarLink href="/dashboard/equipe" active={pathname.startsWith('/dashboard/equipe')}>
+                👥 Gestão de Equipe
+              </SidebarLink>
+            </>
+          )}
         </nav>
         
         <div className="p-6">

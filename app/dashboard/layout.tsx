@@ -12,18 +12,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/login');
   }
 
-  // Buscar perfil do ACS
+  // Buscar perfil do profissional
   const { data: acsProfile } = await supabase
     .from('acs')
-    .select('name, ubs:ubs_id(name)')
+    .select('name, role, ubs:ubs_id(name)')
     .eq('auth_user_id', session.user.id)
     .single();
 
   const userName = acsProfile?.name || 'Administrador';
   const unitName = (acsProfile?.ubs as any)?.name || 'Secretaria de Saúde';
+  const userRole = acsProfile?.role || 'acs';
 
   return (
-    <DashboardUI userName={userName} unitName={unitName}>
+    <DashboardUI userName={userName} unitName={unitName} userRole={userRole}>
       {children}
     </DashboardUI>
   );

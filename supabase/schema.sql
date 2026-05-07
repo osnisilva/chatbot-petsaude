@@ -18,7 +18,8 @@ CREATE TABLE public.acs (
     phone_number TEXT UNIQUE NOT NULL,
     cns TEXT UNIQUE NOT NULL, -- Cartão Nacional de Saúde do ACS
     ubs_id UUID REFERENCES public.ubs(id) NOT NULL,
-    microarea TEXT NOT NULL,
+    microarea TEXT, -- Opcional para Gerentes e TI
+    role TEXT NOT NULL DEFAULT 'acs' CHECK (role IN ('acs', 'gerente', 'admin_ti')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

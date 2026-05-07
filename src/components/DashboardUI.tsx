@@ -7,10 +7,11 @@ import MobileHeader from './MobileHeader';
 interface DashboardUIProps {
   userName: string;
   unitName: string;
+  userRole: string;
   children: React.ReactNode;
 }
 
-export default function DashboardUI({ userName, unitName, children }: DashboardUIProps) {
+export default function DashboardUI({ userName, unitName, userRole, children }: DashboardUIProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -18,6 +19,7 @@ export default function DashboardUI({ userName, unitName, children }: DashboardU
       <Sidebar 
         userName={userName} 
         unitName={unitName} 
+        userRole={userRole}
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
       />
