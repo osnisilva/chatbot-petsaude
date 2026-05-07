@@ -32,6 +32,8 @@ CREATE TABLE public.patients (
     cns_masked TEXT, -- Ex: ***.***.***-12
     acs_id UUID REFERENCES public.acs(id), -- ACS responsável
     ubs_id UUID REFERENCES public.ubs(id) NOT NULL,
+    birth_date DATE, -- Importado do e-SUS
+    gender TEXT, -- M, F, Outro
     lgpd_consent BOOLEAN DEFAULT NULL, -- NULL (Pendente), TRUE (Aceito), FALSE (Recusado)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

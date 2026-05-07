@@ -86,6 +86,9 @@ export default function Sidebar({ userName, unitName, userRole, isOpen, onClose 
               <SidebarLink href="/dashboard/equipe" active={pathname.startsWith('/dashboard/equipe')}>
                 👥 Gestão de Equipe
               </SidebarLink>
+              <SidebarLink href="/dashboard/relatorios" active={pathname.startsWith('/dashboard/relatorios')}>
+                📊 Relatórios
+              </SidebarLink>
             </>
           )}
         </nav>
