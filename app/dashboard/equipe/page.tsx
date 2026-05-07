@@ -10,6 +10,7 @@ export default function EquipePage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -25,6 +26,15 @@ export default function EquipePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function fetchEquipe() {
+    const { data: equipeData } = await supabase
+      .from('acs')
+      .select('*, ubs:ubs_id(name)')
+      .order('name');
+    
+    if (equipeData) setEquipe(equipeData);
+  }
+
   useEffect(() => {
     async function fetchData() {
       // 1. Pegar papel do usuário atual
@@ -36,18 +46,10 @@ export default function EquipePage() {
           .eq('auth_user_id', user.id)
           .single();
         setUserRole(profile?.role || 'acs');
-        if (profile?.role === 'gerente') {
-            setFormData(prev => ({ ...prev, ubs_id: profile.ubs_id }));
-        }
       }
 
-      // 2. Pegar lista de profissionais
-      const { data: equipeData } = await supabase
-        .from('acs')
-        .select('*, ubs:ubs_id(name)')
-        .order('name');
-      
-      if (equipeData) setEquipe(equipeData);
+      // 2. Pegar profissionais
+      await fetchEquipe();
 
       // 3. Pegar lista de UBS
       const { data: ubsData } = await supabase
@@ -63,37 +65,67 @@ export default function EquipePage() {
     fetchData();
   }, []);
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const openEditModal = (user: any) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name || '',
+      email: '', // Não editamos e-mail/senha aqui por segurança por enquanto
+      password: '',
+      phone_number: user.phone_number || '',
+      cns: user.cns || '',
+      ubs_id: user.ubs_id || '',
+      microarea: user.microarea || '',
+      role: user.role || 'acs'
+    });
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingUser(null);
+    setFormData({
+      name: '', email: '', password: '', phone_number: '',
+      cns: '', ubs_id: '', microarea: '', role: 'acs'
+    });
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      if (editingUser) {
+        // MODO EDIÇÃO
+        const { error: updateError } = await supabase
+          .from('acs')
+          .update({
+            name: formData.name,
+            phone_number: formData.phone_number,
+            cns: formData.cns,
+            ubs_id: formData.ubs_id,
+            microarea: formData.microarea,
+            role: formData.role
+          })
+          .eq('id', editingUser.id);
 
-      const result = await response.json();
+        if (updateError) throw updateError;
+      } else {
+        // MODO CRIAÇÃO
+        const response = await fetch('/api/admin/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao criar usuário');
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Erro ao criar usuário');
       }
 
-      // Sucesso
-      setShowModal(false);
-      // Recarregar lista
-      const { data } = await supabase.from('acs').select('*, ubs:ubs_id(name)').order('name');
-      if (data) setEquipe(data);
-      
-      // Limpar form
-      setFormData({
-        name: '', email: '', password: '', phone_number: '',
-        cns: '', ubs_id: userRole === 'gerente' ? formData.ubs_id : '', 
-        microarea: '', role: 'acs'
-      });
-
+      // Sucesso Comum
+      handleCloseModal();
+      await fetchEquipe();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -126,16 +158,17 @@ export default function EquipePage() {
                 <th className="p-6 font-bold">Unidade (UBS)</th>
                 <th className="p-6 font-bold">Microárea</th>
                 <th className="p-6 font-bold">Contato</th>
+                <th className="p-6 font-bold text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">Carregando equipe...</td>
+                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">Carregando equipe...</td>
                 </tr>
               ) : equipe.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">Nenhum profissional encontrado.</td>
+                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">Nenhum profissional encontrado.</td>
                 </tr>
               ) : (
                 equipe.map((p) => (
@@ -156,6 +189,14 @@ export default function EquipePage() {
                     <td className="p-6 text-slate-500 font-medium">{(p.ubs as any)?.name || '-'}</td>
                     <td className="p-6 text-slate-400 font-bold">{p.microarea || 'N/A'}</td>
                     <td className="p-6 text-slate-500 text-sm">{p.phone_number}</td>
+                    <td className="p-6">
+                        <button 
+                            onClick={() => openEditModal(p)}
+                            className="mx-auto block p-2 hover:bg-white rounded-xl text-slate-400 hover:text-teal-600 transition-all shadow-none hover:shadow-sm"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -164,18 +205,20 @@ export default function EquipePage() {
         </div>
       </div>
 
-      {/* Modal de Cadastro */}
+      {/* Modal de Cadastro/Edição */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h2 className="text-xl font-black text-slate-800">Cadastrar Profissional</h2>
-                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                <h2 className="text-xl font-black text-slate-800">
+                    {editingUser ? 'Editar Profissional' : 'Cadastrar Profissional'}
+                </h2>
+                <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
             
-            <form onSubmit={handleCreateUser} className="p-8 space-y-6">
+            <form onSubmit={handleSubmit} className="p-8 space-y-6">
                 {error && (
                     <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl text-sm font-bold border border-rose-100">
                         {error}
@@ -192,24 +235,28 @@ export default function EquipePage() {
                             onChange={e => setFormData({...formData, name: e.target.value})}
                         />
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">E-mail (Login)</label>
-                        <input 
-                            required type="email"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
-                            value={formData.email}
-                            onChange={e => setFormData({...formData, email: e.target.value})}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Senha Inicial</label>
-                        <input 
-                            required type="password"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
-                            value={formData.password}
-                            onChange={e => setFormData({...formData, password: e.target.value})}
-                        />
-                    </div>
+                    {!editingUser && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">E-mail (Login)</label>
+                                <input 
+                                    required type="email"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
+                                    value={formData.email}
+                                    onChange={e => setFormData({...formData, email: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Senha Inicial</label>
+                                <input 
+                                    required type="password"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
+                                    value={formData.password}
+                                    onChange={e => setFormData({...formData, password: e.target.value})}
+                                />
+                            </div>
+                        </>
+                    )}
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cargo / Papel</label>
                         <select 
@@ -268,7 +315,7 @@ export default function EquipePage() {
                 <div className="flex gap-4 pt-4">
                     <button 
                         type="button"
-                        onClick={() => setShowModal(false)}
+                        onClick={handleCloseModal}
                         className="flex-1 px-6 py-3.5 border border-slate-200 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
                     >
                         Cancelar
@@ -278,7 +325,7 @@ export default function EquipePage() {
                         disabled={saving}
                         className="flex-1 px-6 py-3.5 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-2xl font-bold shadow-lg disabled:opacity-50 transition-all"
                     >
-                        {saving ? 'Salvando...' : 'Cadastrar Profissional'}
+                        {saving ? 'Salvando...' : editingUser ? 'Salvar Alterações' : 'Cadastrar Profissional'}
                     </button>
                 </div>
             </form>
