@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
-import { revalidatePath } from 'next/cache';
+import PatientCard from './PatientCard';
+import { createScheduleAction } from './actions';
 
 export default async function AgendamentosPage() {
   const supabase = await createClient();
@@ -16,7 +17,7 @@ export default async function AgendamentosPage() {
 
   const isSecretaria = (acs?.ubs as any)?.name === 'Secretaria de Saúde';
 
-  // 2. Buscar Todos os Pacientes (Removido o filtro de comorbidade a pedido do usuário)
+  // 2. Buscar Todos os Pacientes
   let patientsQuery = supabase.from('patients').select('id, name, phone_number, comorbidities');
   
   if (!isSecretaria && acs?.ubs_id) {
@@ -44,7 +45,7 @@ export default async function AgendamentosPage() {
 
   const { data: schedules } = await schedulesQuery;
 
-  // 5. Agrupar Agendamentos por Paciente para a visão em Cards
+  // 5. Agrupar Agendamentos por Paciente
   const groupedSchedules = (schedules || []).reduce((acc: any, s: any) => {
     const pId = s.patient_id;
     if (!acc[pId]) {
@@ -59,57 +60,6 @@ export default async function AgendamentosPage() {
 
   const patientIds = Object.keys(groupedSchedules);
 
-  // -----------------------------------------------------
-  // Ações de Servidor
-  // -----------------------------------------------------
-  async function createSchedule(formData: FormData) {
-    "use server";
-    try {
-      const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const acsProfile = await supabase.from('acs').select('id').eq('auth_user_id', user.id).single();
-      if (!acsProfile.data) throw new Error("Perfil ACS não encontrado");
-
-      const patient_id = formData.get('patient_id');
-      const template_id = formData.get('template_id');
-      const frequency = formData.get('frequency');
-      const next_run_at = new Date().toISOString();
-
-      const { error } = await supabase.from('scheduled_messages').insert({
-        acs_id: acsProfile.data.id,
-        patient_id,
-        template_id,
-        frequency,
-        next_run_at,
-        status: 'active'
-      });
-
-      if (error) throw error;
-      revalidatePath('/dashboard/agendamentos');
-    } catch (err: any) {
-      console.error('Erro ao criar agendamento:', err.message);
-    }
-  }
-
-  async function deleteSchedule(formData: FormData) {
-    "use server";
-    try {
-      const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const id = formData.get('schedule_id');
-      if (!id) return;
-
-      await supabase.from('scheduled_messages').delete().eq('id', id);
-      revalidatePath('/dashboard/agendamentos');
-    } catch (err: any) {
-      console.error('Erro ao excluir agendamento:', err.message);
-    }
-  }
-
   return (
     <div className="p-8 h-full overflow-y-auto bg-slate-50/50">
       <div className="flex justify-between items-end mb-8">
@@ -122,9 +72,9 @@ export default async function AgendamentosPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Formulário de Criação (Lateral) */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 sticky top-0">
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 sticky top-8">
             <h2 className="font-bold text-lg text-slate-800 mb-4">Nova Programação</h2>
-            <form action={createSchedule} className="space-y-4">
+            <form action={createScheduleAction} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Paciente</label>
                 <select name="patient_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
@@ -185,42 +135,13 @@ export default async function AgendamentosPage() {
               {patientIds.map(pId => {
                 const group = groupedSchedules[pId];
                 return (
-                  <div key={pId} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-bold text-lg text-slate-800">{group.patientName}</h3>
-                        <p className="text-xs text-slate-400 font-mono">ID: {pId.substring(0, 8)}...</p>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl">
-                        👤
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Trilhas Ativas</p>
-                      {group.campaigns.map((camp: any) => (
-                        <div key={camp.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-100 group">
-                          <div className="flex-1 min-w-0 pr-4">
-                            <div className="font-bold text-sm text-slate-700 truncate">{(camp.template as any)?.title}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg font-bold capitalize">
-                                {camp.frequency}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                Próximo: {new Date(camp.next_run_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                          <form action={deleteSchedule}>
-                            <input type="hidden" name="schedule_id" value={camp.id} />
-                            <button type="submit" className="text-slate-300 hover:text-rose-500 transition-colors p-2 hover:bg-rose-50 rounded-xl">
-                              🗑️
-                            </button>
-                          </form>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <PatientCard 
+                    key={pId}
+                    patientId={pId}
+                    patientName={group.patientName}
+                    campaigns={group.campaigns}
+                    templates={templates || []}
+                  />
                 );
               })}
             </div>
