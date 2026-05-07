@@ -140,37 +140,51 @@ export default async function DashboardPage({
   // 8. Dados de Engajamento por ACS (Apenas para Gestores)
   let engagementData: any[] = [];
   if (isAdmin || isManager) {
-    let patientAcsQuery = supabase
-      .from('patients')
-      .select('id, acs:acs_id(id, name, ubs:ubs_id(name))')
-      .not('acs_id', 'is', null);
-
-    if (selectedUbsId) patientAcsQuery = patientAcsQuery.eq('ubs_id', selectedUbsId);
-
-    // Filtrar apenas pacientes que tiveram interação com Bot
-    patientAcsQuery = patientAcsQuery.filter('id', 'in', 
-      supabase.from('chat_sessions').select('patient_id').filter('id', 'in', 
-          supabase.from('messages').select('session_id').eq('sender_type', 'bot')
-      )
-    );
-
-    const { data: patientsWithBot } = await patientAcsQuery;
+    // Pegar IDs de sessões que têm mensagens do Bot
+    const { data: sessionsWithBot } = await supabase
+      .from('messages')
+      .select('session_id')
+      .eq('sender_type', 'bot');
     
-    const engagementMap: Record<string, any> = {};
-    patientsWithBot?.forEach(p => {
-      if (!p.acs) return;
-      const acs = (p.acs as any);
-      if (!engagementMap[acs.id]) {
-        engagementMap[acs.id] = {
-          acs_id: acs.id,
-          acs_name: acs.name,
-          ubs_name: acs.ubs?.name || '-',
-          bot_patients_count: 0
-        };
+    const sessionIds = [...new Set(sessionsWithBot?.map(s => s.session_id) || [])];
+
+    if (sessionIds.length > 0) {
+      // Pegar IDs de pacientes dessas sessões
+      const { data: sessions } = await supabase
+        .from('chat_sessions')
+        .select('patient_id')
+        .in('id', sessionIds);
+      
+      const patientIds = [...new Set(sessions?.map(s => s.patient_id) || [])];
+
+      if (patientIds.length > 0) {
+        let patientAcsQuery = supabase
+          .from('patients')
+          .select('id, acs:acs_id(id, name, ubs:ubs_id(name))')
+          .not('acs_id', 'is', null)
+          .in('id', patientIds);
+
+        if (selectedUbsId) patientAcsQuery = patientAcsQuery.eq('ubs_id', selectedUbsId);
+
+        const { data: patientsWithBot } = await patientAcsQuery;
+        
+        const engagementMap: Record<string, any> = {};
+        patientsWithBot?.forEach(p => {
+          if (!p.acs) return;
+          const acs = (p.acs as any);
+          if (!engagementMap[acs.id]) {
+            engagementMap[acs.id] = {
+              acs_id: acs.id,
+              acs_name: acs.name,
+              ubs_name: acs.ubs?.name || '-',
+              bot_patients_count: 0
+            };
+          }
+          engagementMap[acs.id].bot_patients_count++;
+        });
+        engagementData = Object.values(engagementMap).sort((a, b) => b.bot_patients_count - a.bot_patients_count);
       }
-      engagementMap[acs.id].bot_patients_count++;
-    });
-    engagementData = Object.values(engagementMap).sort((a, b) => b.bot_patients_count - a.bot_patients_count);
+    }
   }
 
   return (
