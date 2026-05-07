@@ -24,7 +24,7 @@ export default async function AgendamentosPage() {
   }
   
   const { data: allPatients } = await patientsQuery;
-  const eligiblePatients = (allPatients || []).filter(p => p.comorbidities && p.comorbidities.length > 0);
+  const availablePatients = allPatients || [];
 
   // 3. Buscar Templates da Biblioteca
   const { data: templates } = await supabase.from('health_templates').select('id, title, category');
@@ -106,7 +106,7 @@ export default async function AgendamentosPage() {
       <div className="flex justify-between items-end mb-8">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Agendamento de Campanhas</h1>
-          <p className="text-slate-500 mt-2">Programe trilhas de cuidado para seus pacientes com comorbidades.</p>
+          <p className="text-slate-500 mt-2">Programe trilhas de cuidado para seus pacientes.</p>
         </div>
       </div>
 
@@ -117,15 +117,15 @@ export default async function AgendamentosPage() {
           
           <form action={createSchedule} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Paciente (Apenas com Comorbidades)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Paciente</label>
               <select name="patient_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
                 <option value="">Selecione o paciente...</option>
-                {eligiblePatients.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.comorbidities?.join(', ')})</option>
+                {availablePatients.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} {p.comorbidities?.length > 0 ? `(${p.comorbidities.join(', ')})` : ''}</option>
                 ))}
               </select>
-              {eligiblePatients.length === 0 && (
-                <p className="text-xs text-rose-500 mt-2">Nenhum paciente com comorbidade cadastrada na sua UBS.</p>
+              {availablePatients.length === 0 && (
+                <p className="text-xs text-rose-500 mt-2">Nenhum paciente cadastrado na sua UBS.</p>
               )}
             </div>
 
@@ -151,7 +151,7 @@ export default async function AgendamentosPage() {
 
             <button 
               type="submit" 
-              disabled={eligiblePatients.length === 0}
+              disabled={availablePatients.length === 0}
               className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-2xl shadow-sm transition-colors mt-2"
             >
               Programar Envio
