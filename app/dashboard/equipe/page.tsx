@@ -59,8 +59,8 @@ export default function EquipePage() {
     setEditingUser(user);
     setFormData({
       name: user.name || '',
-      email: '', 
-      password: '',
+      email: user.email || '', 
+      password: '', // Senha sempre vazia ao abrir (apenas se quiser trocar)
       phone_number: user.phone_number || '',
       cns: user.cns || '',
       ubs_id: user.ubs_id || '',
@@ -81,7 +81,7 @@ export default function EquipePage() {
   };
 
   const handleDelete = async (id: string, auth_user_id: string | null) => {
-    if (!window.confirm('Tem certeza que deseja excluir este profissional? Esta ação é irreversível e removerá o acesso de login.')) {
+    if (!window.confirm('Tem certeza que deseja excluir este profissional? Esta ação é irreversível.')) {
       return;
     }
 
@@ -93,11 +93,7 @@ export default function EquipePage() {
         body: JSON.stringify({ id, auth_user_id }),
       });
 
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || 'Erro ao excluir');
-      }
-
+      if (!response.ok) throw new Error('Erro ao excluir');
       await fetchEquipe();
     } catch (err: any) {
       alert(err.message);
@@ -113,20 +109,22 @@ export default function EquipePage() {
 
     try {
       if (editingUser) {
-        const { error: updateError } = await supabase
-          .from('acs')
-          .update({
-            name: formData.name,
-            phone_number: formData.phone_number,
-            cns: formData.cns,
-            ubs_id: formData.ubs_id,
-            microarea: formData.microarea,
-            role: formData.role
-          })
-          .eq('id', editingUser.id);
+        // ATUALIZAÇÃO (DB + Auth)
+        const response = await fetch('/api/admin/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            id: editingUser.id,
+            auth_user_id: editingUser.auth_user_id
+          }),
+        });
 
-        if (updateError) throw updateError;
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Erro ao atualizar');
+
       } else {
+        // CRIAÇÃO
         const response = await fetch('/api/admin/create-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -167,28 +165,27 @@ export default function EquipePage() {
             <thead>
               <tr className="bg-slate-50/50 text-slate-500 text-xs uppercase tracking-widest border-b border-slate-100">
                 <th className="p-6 font-bold">Nome</th>
-                <th className="p-6 font-bold">Cargo</th>
+                <th className="p-6 font-bold">Cargo / E-mail</th>
                 <th className="p-6 font-bold">Unidade (UBS)</th>
                 <th className="p-6 font-bold">Microárea</th>
-                <th className="p-6 font-bold">Contato</th>
                 <th className="p-6 font-bold text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">Carregando equipe...</td>
+                  <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">Carregando equipe...</td>
                 </tr>
               ) : equipe.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">Nenhum profissional encontrado.</td>
+                  <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">Nenhum profissional encontrado.</td>
                 </tr>
               ) : (
                 equipe.map((p) => (
                   <tr key={p.id} className="border-b border-slate-50 hover:bg-teal-50/30 transition-colors">
                     <td className="p-6">
                         <div className="font-bold text-slate-700">{p.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{p.cns}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{p.cns || 'Sem CNS'}</div>
                     </td>
                     <td className="p-6">
                         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
@@ -198,10 +195,10 @@ export default function EquipePage() {
                         }`}>
                             {p.role === 'admin_ti' ? 'TI / Admin' : p.role === 'gerente' ? 'Gerente' : 'ACS'}
                         </span>
+                        <div className="text-xs text-slate-400 mt-1 font-medium italic">{p.email || 'Sem e-mail'}</div>
                     </td>
                     <td className="p-6 text-slate-500 font-medium">{(p.ubs as any)?.name || '-'}</td>
                     <td className="p-6 text-slate-400 font-bold">{p.microarea || 'N/A'}</td>
-                    <td className="p-6 text-slate-500 text-sm">{p.phone_number}</td>
                     <td className="p-6">
                         <div className="flex items-center justify-center gap-2">
                             <button 
@@ -263,28 +260,30 @@ export default function EquipePage() {
                             onChange={e => setFormData({...formData, name: e.target.value})}
                         />
                     </div>
-                    {!editingUser && (
-                        <>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">E-mail (Login)</label>
-                                <input 
-                                    required type="email"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
-                                    value={formData.email}
-                                    onChange={e => setFormData({...formData, email: e.target.value})}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Senha Inicial</label>
-                                <input 
-                                    required type="password"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
-                                    value={formData.password}
-                                    onChange={e => setFormData({...formData, password: e.target.value})}
-                                />
-                            </div>
-                        </>
-                    )}
+                    
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">E-mail (Login)</label>
+                        <input 
+                            required type="email"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
+                            value={formData.email}
+                            onChange={e => setFormData({...formData, email: e.target.value})}
+                        />
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                            {editingUser ? 'Nova Senha (deixe em branco para manter)' : 'Senha Inicial'}
+                        </label>
+                        <input 
+                            required={!editingUser}
+                            type="password"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:bg-white outline-none transition-all"
+                            value={formData.password}
+                            onChange={e => setFormData({...formData, password: e.target.value})}
+                        />
+                    </div>
+
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cargo / Papel</label>
                         <select 

@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
+    const { name, email, password, role, ubs_id, microarea, phone_number, cns } = await request.json();
+
+    // Criar cliente admin (Service Role)
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -14,44 +17,34 @@ export async function POST(request: Request) {
       }
     );
 
-    const body = await request.json();
-    const { email, password, name, phone_number, cns, ubs_id, microarea, role } = body;
-
-    // 1. Criar o usuário no Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // 1. Criar usuário no Auth do Supabase
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { name, role }
     });
 
-    if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 400 });
-    }
+    if (authError) throw authError;
 
-    // 2. Criar o registro na tabela ACS
+    // 2. Criar perfil na tabela 'acs'
     const { error: dbError } = await supabaseAdmin
       .from('acs')
-      .insert([
-        {
-          auth_user_id: authData.user.id,
-          name,
-          phone_number,
-          cns,
-          ubs_id,
-          microarea: microarea || null,
-          role: role || 'acs'
-        }
-      ]);
+      .insert({
+        auth_user_id: authUser.user.id,
+        name,
+        email, // Salvamos o email aqui também para facilitar a gestão
+        role,
+        ubs_id,
+        microarea,
+        phone_number,
+        cns
+      });
 
-    if (dbError) {
-      // Rollback: Deletar o usuário auth se o insert na tabela falhar
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return NextResponse.json({ error: dbError.message }, { status: 400 });
-    }
+    if (dbError) throw dbError;
 
-    return NextResponse.json({ success: true, user: authData.user });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: true, user: authUser.user });
+  } catch (error: any) {
+    console.error('Erro na API de administração:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
