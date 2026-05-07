@@ -11,6 +11,7 @@ export default function EquipePage() {
   const [showModal, setShowModal] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -37,7 +38,6 @@ export default function EquipePage() {
 
   useEffect(() => {
     async function fetchData() {
-      // 1. Pegar papel do usuário atual
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -47,21 +47,11 @@ export default function EquipePage() {
           .single();
         setUserRole(profile?.role || 'acs');
       }
-
-      // 2. Pegar profissionais
       await fetchEquipe();
-
-      // 3. Pegar lista de UBS
-      const { data: ubsData } = await supabase
-        .from('ubs')
-        .select('id, name')
-        .order('name');
-      
+      const { data: ubsData } = await supabase.from('ubs').select('id, name').order('name');
       if (ubsData) setUbsList(ubsData);
-      
       setLoading(false);
     }
-    
     fetchData();
   }, []);
 
@@ -69,7 +59,7 @@ export default function EquipePage() {
     setEditingUser(user);
     setFormData({
       name: user.name || '',
-      email: '', // Não editamos e-mail/senha aqui por segurança por enquanto
+      email: '', 
       password: '',
       phone_number: user.phone_number || '',
       cns: user.cns || '',
@@ -90,6 +80,32 @@ export default function EquipePage() {
     setError(null);
   };
 
+  const handleDelete = async (id: string, auth_user_id: string | null) => {
+    if (!window.confirm('Tem certeza que deseja excluir este profissional? Esta ação é irreversível e removerá o acesso de login.')) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const response = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, auth_user_id }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Erro ao excluir');
+      }
+
+      await fetchEquipe();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -97,7 +113,6 @@ export default function EquipePage() {
 
     try {
       if (editingUser) {
-        // MODO EDIÇÃO
         const { error: updateError } = await supabase
           .from('acs')
           .update({
@@ -112,7 +127,6 @@ export default function EquipePage() {
 
         if (updateError) throw updateError;
       } else {
-        // MODO CRIAÇÃO
         const response = await fetch('/api/admin/create-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -123,7 +137,6 @@ export default function EquipePage() {
         if (!response.ok) throw new Error(result.error || 'Erro ao criar usuário');
       }
 
-      // Sucesso Comum
       handleCloseModal();
       await fetchEquipe();
     } catch (err: any) {
@@ -190,12 +203,27 @@ export default function EquipePage() {
                     <td className="p-6 text-slate-400 font-bold">{p.microarea || 'N/A'}</td>
                     <td className="p-6 text-slate-500 text-sm">{p.phone_number}</td>
                     <td className="p-6">
-                        <button 
-                            onClick={() => openEditModal(p)}
-                            className="mx-auto block p-2 hover:bg-white rounded-xl text-slate-400 hover:text-teal-600 transition-all shadow-none hover:shadow-sm"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                            <button 
+                                onClick={() => openEditModal(p)}
+                                className="p-2 hover:bg-white rounded-xl text-slate-400 hover:text-teal-600 transition-all shadow-none hover:shadow-sm"
+                                title="Editar"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                            </button>
+                            <button 
+                                onClick={() => handleDelete(p.id, p.auth_user_id)}
+                                disabled={deletingId === p.id}
+                                className={`p-2 hover:bg-white rounded-xl transition-all shadow-none hover:shadow-sm ${deletingId === p.id ? 'text-slate-300' : 'text-slate-400 hover:text-rose-600'}`}
+                                title="Excluir"
+                            >
+                                {deletingId === p.id ? (
+                                    <div className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                )}
+                            </button>
+                        </div>
                     </td>
                   </tr>
                 ))
