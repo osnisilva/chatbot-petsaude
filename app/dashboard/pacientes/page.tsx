@@ -3,9 +3,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Search, Filter } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function PacientesPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -143,7 +145,11 @@ export default function PacientesPage() {
                 </tr>
               ) : (
                 filteredPacientes.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-50 hover:bg-teal-50/30 transition-colors">
+                  <tr 
+                    key={p.id} 
+                    className="border-b border-slate-50 hover:bg-teal-50/30 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/dashboard/chat?patientId=${p.id}`)}
+                  >
                     <td className="p-6">
                       <div className="font-bold text-slate-700">{p.name}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-1 uppercase tracking-tight">{p.cns_masked || 'CNS não informado'}</div>

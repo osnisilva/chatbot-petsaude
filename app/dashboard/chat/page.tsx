@@ -19,11 +19,44 @@ export default function ChatPage() {
     async function fetchSessions() {
       const { data } = await supabase
         .from('chat_sessions')
-        .select('id, status, updated_at, patients(id, name, phone_number)')
+        .select('id, status, updated_at, patient_id, patients(id, name, phone_number)')
         .in('status', ['active', 'escalated'])
         .order('updated_at', { ascending: false });
       
-      if (data) setSessions(data);
+      if (data) {
+        setSessions(data);
+
+        // Verifica se veio de um redirecionamento com patientId
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const patientIdFromUrl = urlParams.get('patientId');
+
+          if (patientIdFromUrl) {
+            const existingSession = data.find(s => s.patient_id === patientIdFromUrl);
+            
+            if (existingSession) {
+              setSelectedSession(existingSession);
+              window.history.replaceState({}, '', '/dashboard/chat');
+            } else {
+              // Cria uma nova sessão escalada para o ACS iniciar a conversa
+              const { data: newSession, error } = await supabase
+                .from('chat_sessions')
+                .insert({
+                  patient_id: patientIdFromUrl,
+                  status: 'escalated'
+                })
+                .select('id, status, updated_at, patient_id, patients(id, name, phone_number)')
+                .single();
+
+              if (newSession && !error) {
+                setSessions(prev => [newSession, ...prev]);
+                setSelectedSession(newSession);
+                window.history.replaceState({}, '', '/dashboard/chat');
+              }
+            }
+          }
+        }
+      }
     }
     fetchSessions();
 
