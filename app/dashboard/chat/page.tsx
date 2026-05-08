@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { useUnread } from '@/components/UnreadProvider';
 
 export default function ChatPage() {
   const supabase = createClient();
@@ -13,6 +14,8 @@ export default function ChatPage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const { unreadCounts, markSessionAsRead, setActiveSessionId } = useUnread();
 
   // Carrega as sessões ativas e escaladas
   useEffect(() => {
@@ -111,6 +114,15 @@ export default function ChatPage() {
       .subscribe();
 
     return () => { supabase.removeChannel(msgChannel); };
+  }, [selectedSession]);
+
+  useEffect(() => {
+    if (selectedSession) {
+      setActiveSessionId(selectedSession.id);
+      markSessionAsRead(selectedSession.id);
+    } else {
+      setActiveSessionId(null);
+    }
   }, [selectedSession]);
 
   const scrollToBottom = () => {
@@ -257,11 +269,21 @@ export default function ChatPage() {
           {sessions.map(session => (
             <div 
               key={session.id} 
-              onClick={() => setSelectedSession(session)}
+              onClick={() => {
+                setSelectedSession(session);
+                markSessionAsRead(session.id);
+              }}
               className={`p-4 mx-2 mb-2 rounded-2xl cursor-pointer transition-all duration-200 ${selectedSession?.id === session.id ? 'bg-teal-50 shadow-sm border border-teal-100/50' : 'hover:bg-slate-50 border border-transparent'}`}
             >
               <div className="flex justify-between items-start">
-                <span className="font-bold text-slate-800">{(session.patients as any)?.name || 'Desconhecido'}</span>
+                <span className="font-bold text-slate-800 flex items-center gap-2">
+                  {(session.patients as any)?.name || 'Desconhecido'}
+                  {unreadCounts[session.id] > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-sm animate-pulse">
+                      {unreadCounts[session.id]}
+                    </span>
+                  )}
+                </span>
                 {session.status === 'escalated' && <span className="bg-amber-100 text-amber-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Em Atendimento</span>}
                 {session.status === 'active' && <span className="bg-sky-100 text-sky-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Com a IA</span>}
               </div>

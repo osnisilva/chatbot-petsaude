@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import DashboardUI from '@/components/DashboardUI';
+import { UnreadProvider } from '@/components/UnreadProvider';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -24,9 +25,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const userRole = acsProfile?.role || 'acs';
 
   return (
-    <DashboardUI userName={userName} unitName={unitName} userRole={userRole}>
-      {children}
-    </DashboardUI>
+    <UnreadProvider>
+      <DashboardUI userName={userName} unitName={unitName} userRole={userRole}>
+        {children}
+      </DashboardUI>
+    </UnreadProvider>
   );
 }
 

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { useUnread } from './UnreadProvider';
 
 interface SidebarProps {
   userName: string;
@@ -14,6 +15,7 @@ interface SidebarProps {
 
 export default function Sidebar({ userName, unitName, userRole, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { totalUnread } = useUnread();
 
   // Fechar sidebar ao mudar de rota em dispositivos móveis
   useEffect(() => {
@@ -69,7 +71,14 @@ export default function Sidebar({ userName, unitName, userRole, isOpen, onClose 
             Pacientes
           </SidebarLink>
           <SidebarLink href="/dashboard/chat" active={pathname.startsWith('/dashboard/chat')}>
-            Chat ao Vivo
+            <div className="flex items-center justify-between w-full">
+              <span>Chat ao Vivo</span>
+              {totalUnread > 0 && (
+                <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                  {totalUnread}
+                </span>
+              )}
+            </div>
           </SidebarLink>
           
           <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 mt-6 mb-2">Trilhas de Cuidado</div>
