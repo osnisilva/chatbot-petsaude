@@ -123,11 +123,13 @@ export default function ChatPage() {
     if (!selectedSession) return;
     await supabase.from('chat_sessions').update({ status: 'escalated' }).eq('id', selectedSession.id);
     setSelectedSession({ ...selectedSession, status: 'escalated' });
+    setSessions(prev => prev.map(s => s.id === selectedSession.id ? { ...s, status: 'escalated' } : s));
   };
 
   const resolverAtendimento = async () => {
     if (!selectedSession) return;
     await supabase.from('chat_sessions').update({ status: 'resolved' }).eq('id', selectedSession.id);
+    setSessions(prev => prev.filter(s => s.id !== selectedSession.id));
     setSelectedSession(null);
   };
 
