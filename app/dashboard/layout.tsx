@@ -23,10 +23,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const userName = acsProfile?.name || 'Administrador';
   const unitName = (acsProfile?.ubs as any)?.name || 'Secretaria de Saúde';
   const userRole = acsProfile?.role || 'acs';
+  const userEmail = session.user.email || '';
 
   return (
     <UnreadProvider>
-      <DashboardUI userName={userName} unitName={unitName} userRole={userRole}>
+      <DashboardUI userName={userName} unitName={unitName} userRole={userRole} userEmail={userEmail}>
         {children}
       </DashboardUI>
     </UnreadProvider>

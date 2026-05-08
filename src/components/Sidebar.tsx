@@ -9,11 +9,12 @@ interface SidebarProps {
   userName: string;
   unitName: string;
   userRole: string;
+  userEmail: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function Sidebar({ userName, unitName, userRole, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ userName, unitName, userRole, userEmail, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { totalUnread } = useUnread();
 
@@ -110,6 +111,7 @@ export default function Sidebar({ userName, unitName, userRole, isOpen, onClose 
               </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-bold text-slate-700 truncate">{userName}</p>
+                <p className="text-[10px] font-mono text-slate-400 truncate mb-0.5">{userEmail}</p>
                 <p className="text-xs text-slate-500 truncate" title={unitName}>{unitName}</p>
               </div>
             </div>

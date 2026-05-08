@@ -8,10 +8,11 @@ interface DashboardUIProps {
   userName: string;
   unitName: string;
   userRole: string;
+  userEmail: string;
   children: React.ReactNode;
 }
 
-export default function DashboardUI({ userName, unitName, userRole, children }: DashboardUIProps) {
+export default function DashboardUI({ userName, unitName, userRole, userEmail, children }: DashboardUIProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -20,6 +21,7 @@ export default function DashboardUI({ userName, unitName, userRole, children }: 
         userName={userName} 
         unitName={unitName} 
         userRole={userRole}
+        userEmail={userEmail}
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
       />
