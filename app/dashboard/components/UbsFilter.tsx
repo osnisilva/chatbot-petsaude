@@ -5,10 +5,11 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 interface UbsFilterProps {
   ubsList: { id: string, name: string }[];
   currentUbsId: string | null;
+  currentUbsName?: string;
   disabled?: boolean;
 }
 
-export default function UbsFilter({ ubsList, currentUbsId, disabled }: UbsFilterProps) {
+export default function UbsFilter({ ubsList, currentUbsId, currentUbsName, disabled }: UbsFilterProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -36,7 +37,7 @@ export default function UbsFilter({ ubsList, currentUbsId, disabled }: UbsFilter
           ${disabled ? 'opacity-70 bg-slate-50 cursor-not-allowed' : 'hover:border-teal-200'}
         `}
       >
-        <option value="">{disabled ? 'Sua Unidade' : 'Todas as Unidades (Total)'}</option>
+        <option value="">{disabled ? (currentUbsName || 'Sua Unidade') : 'Todas as Unidades (Total)'}</option>
         {ubsList.map((ubs) => (
           <option key={ubs.id} value={ubs.id}>
             {ubs.name}

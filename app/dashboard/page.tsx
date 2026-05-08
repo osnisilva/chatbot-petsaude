@@ -205,7 +205,8 @@ export default async function DashboardPage({
             {/* Componente de Filtro */}
             <UbsFilter 
                 ubsList={ubsList} 
-                currentUbsId={selectedUbsId} 
+                currentUbsId={selectedUbsId}
+                currentUbsName={(profile?.ubs as any)?.name}
                 disabled={!isAdmin} 
             />
 
