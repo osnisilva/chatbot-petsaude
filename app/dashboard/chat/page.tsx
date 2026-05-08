@@ -303,7 +303,7 @@ export default function ChatPage() {
                 )}
                 {selectedSession.status === 'escalated' && (
                   <button onClick={resolverAtendimento} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-[0_4px_14px_rgba(16,185,129,0.39)] transition-all">
-                    ✓ Resolver Atendimento
+                    ✓ Encerrar Atendimento
                   </button>
                 )}
               </div>
