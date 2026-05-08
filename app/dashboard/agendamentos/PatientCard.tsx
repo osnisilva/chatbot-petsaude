@@ -40,9 +40,18 @@ export default function PatientCard({ patientId, patientName, ubsName, campaigns
         {campaigns.map((camp: any) => (
           <div key={camp.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-100 group">
             <div className="flex-1 min-w-0 pr-4">
-              <div className="font-bold text-sm text-slate-700 truncate">{(camp.template as any)?.title}</div>
+              <div className="font-bold text-sm text-slate-700 truncate flex items-center gap-1">
+                {camp.is_random ? (
+                  <>
+                    <span className="text-emerald-600">✨</span> 
+                    Trilha de {camp.category.charAt(0).toUpperCase() + camp.category.slice(1)}
+                  </>
+                ) : (
+                  (camp.template as any)?.title
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg font-bold capitalize">
+                <span className={`text-[10px] px-2 py-0.5 rounded-lg font-bold capitalize ${camp.is_random ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                   {camp.frequency}
                 </span>
                 <span className="text-[10px] text-slate-400">

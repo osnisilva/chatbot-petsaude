@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import PatientCard from './PatientCard';
 import { createScheduleAction } from './actions';
+import ScheduleFormFields from './ScheduleFormFields';
 
 export default async function AgendamentosPage() {
   const supabase = await createClient();
@@ -33,7 +34,7 @@ export default async function AgendamentosPage() {
   // 4. Buscar Agendamentos Ativos
   let schedulesQuery = supabase.from('scheduled_messages')
     .select(`
-      id, patient_id, frequency, next_run_at, status,
+      id, patient_id, frequency, next_run_at, status, is_random, category,
       patient:patient_id(name, ubs:ubs_id(name)),
       template:template_id(title, category)
     `)
@@ -76,43 +77,7 @@ export default async function AgendamentosPage() {
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 sticky top-8">
             <h2 className="font-bold text-lg text-slate-800 mb-4">Nova Programação</h2>
             <form action={createScheduleAction} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Paciente</label>
-                <select name="patient_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
-                  <option value="">Selecione...</option>
-                  {availablePatients.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} {p.comorbidities?.length > 0 ? `(${p.comorbidities.join(', ')})` : ''}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Template</label>
-                <select name="template_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
-                  <option value="">Selecione a mensagem...</option>
-                  {templates?.map(t => (
-                    <option key={t.id} value={t.id}>{t.category.toUpperCase()} - {t.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Frequência</label>
-                <select name="frequency" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
-                  <option value="diario">Diário</option>
-                  <option value="semanal">Semanal</option>
-                  <option value="quinzenal">Quinzenal</option>
-                  <option value="mensal">Mensal</option>
-                </select>
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={availablePatients.length === 0}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-2xl shadow-sm transition-colors mt-2"
-              >
-                Ativar Trilha
-              </button>
+              <ScheduleFormFields availablePatients={availablePatients} templates={templates || []} />
             </form>
           </div>
         </div>

@@ -13,14 +13,18 @@ export async function createScheduleAction(formData: FormData) {
     if (!acsProfile.data) throw new Error("Perfil ACS não encontrado");
 
     const patient_id = formData.get('patient_id');
-    const template_id = formData.get('template_id');
+    const template_id = formData.get('template_id') || null;
+    const is_random = formData.get('is_random') === 'true';
+    const category = formData.get('category');
     const frequency = formData.get('frequency');
     const next_run_at = new Date().toISOString();
 
     const { error } = await supabase.from('scheduled_messages').insert({
       acs_id: acsProfile.data.id,
       patient_id,
-      template_id,
+      template_id: is_random ? null : template_id,
+      is_random,
+      category: is_random ? category : null,
       frequency,
       next_run_at,
       status: 'active'

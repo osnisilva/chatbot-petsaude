@@ -12,9 +12,16 @@ interface AddTrailModalProps {
 
 export default function AddTrailModal({ patientId, patientName, templates, onClose }: AddTrailModalProps) {
   const [loading, setLoading] = useState(false);
+  const [isRandom, setIsRandom] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
+  const selectedCategory = templates.find(t => t.id === selectedTemplateId)?.category || '';
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
+    // Adicionamos manualmente os valores ao formData
+    formData.append('is_random', isRandom.toString());
+    formData.append('category', selectedCategory);
     const result = await createScheduleAction(formData);
     setLoading(false);
     if (result.success) {
@@ -30,12 +37,18 @@ export default function AddTrailModal({ patientId, patientName, templates, onClo
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Adicionar Trilha</h2>
         <p className="text-slate-500 text-sm mb-6">Paciente: <span className="font-bold text-slate-700">{patientName}</span></p>
         
-        <form action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="space-y-6">
           <input type="hidden" name="patient_id" value={patientId} />
           
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Template</label>
-            <select name="template_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mensagem Referência (Assunto)</label>
+            <select 
+              name="template_id" 
+              required 
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium"
+            >
               <option value="">Selecione a mensagem...</option>
               {templates?.map(t => (
                 <option key={t.id} value={t.id}>{t.category.toUpperCase()} - {t.title}</option>
@@ -43,15 +56,45 @@ export default function AddTrailModal({ patientId, patientName, templates, onClo
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Frequência</label>
-            <select name="frequency" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
-              <option value="diario">Diário</option>
-              <option value="semanal">Semanal</option>
-              <option value="quinzenal">Quinzenal</option>
-              <option value="mensal">Mensal</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Frequência</label>
+              <select name="frequency" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
+                <option value="diario">Diário</option>
+                <option value="semanal">Semanal</option>
+                <option value="quinzenal">Quinzenal</option>
+                <option value="mensal">Mensal</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Modo de Envio</label>
+              <div className="bg-slate-50 p-1 rounded-2xl flex border border-slate-200 h-[50px]">
+                <button 
+                  type="button"
+                  onClick={() => setIsRandom(false)}
+                  className={`flex-1 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${!isRandom ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
+                >
+                  Fixo
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setIsRandom(true)}
+                  className={`flex-1 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${isRandom ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
+                >
+                  Aleatório
+                </button>
+              </div>
+            </div>
           </div>
+
+          {isRandom && (
+            <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+              <p className="text-[11px] text-emerald-800 leading-relaxed">
+                ✨ **Modo Inteligente Ativado:** O sistema enviará mensagens variadas da mesma categoria do template escolhido, usando IA para validar a segurança física do paciente.
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button 

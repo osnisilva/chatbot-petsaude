@@ -1,5 +1,5 @@
-const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');
+const { getSafeRandomTemplate } = require('./ai_helper');
 
 // Configuração do Supabase (Service Role é necessário para burlar o RLS e ler todos os agendamentos)
 const supabase = createClient(
@@ -47,7 +47,10 @@ async function processScheduledMessages(whatsappClient) {
             frequency,
             next_run_at,
             patient_id,
-            patients ( phone_number, name ),
+            template_id,
+            is_random,
+            category,
+            patients ( phone_number, name, comorbidities ),
             health_templates ( title, category, content )
         `)
         .eq('status', 'active')
@@ -62,9 +65,10 @@ async function processScheduledMessages(whatsappClient) {
 
     // Filtro Inteligente de Horários por Categoria
     const schedulesToSend = schedules.filter(s => {
-        const cat = s.health_templates.category;
+        // Se for fixo, pega a categoria do template vinculado. Se for randômico, usa a categoria do agendamento.
+        const cat = s.is_random ? s.category : (s.health_templates?.category);
         
-        // Remédios: Manhã (08:00 às 09:59)
+        if (!cat) return true; // Se não tiver categoria, envia em qualquer horário comercial
         if (cat === 'lembrete_medicamento') {
             return currentHour >= 8 && currentHour <= 9;
         }
@@ -93,7 +97,42 @@ async function processScheduledMessages(whatsappClient) {
     for (const schedule of batch) {
         try {
             const phoneNumber = schedule.patients.phone_number;
-            const content = schedule.health_templates.content;
+            let content = '';
+            let title = '';
+
+            // LÓGICA DE SELEÇÃO DE CONTEÚDO (FIXO vs ALEATÓRIO)
+            if (schedule.is_random) {
+                console.log(`[CRON] Processando trilha aleatória (${schedule.category}) para ${schedule.patients.name}`);
+                
+                // 1. Buscar todos os templates da categoria
+                const { data: templates, error: tError } = await supabase
+                    .from('health_templates')
+                    .eq('category', schedule.category);
+
+                if (tError || !templates || templates.length === 0) {
+                    console.error(`[CRON ERRO] Nenhum template encontrado para categoria ${schedule.category}`);
+                    continue;
+                }
+
+                // 2. Pedir para a IA escolher um seguro
+                const safeTemplate = await getSafeRandomTemplate(schedule.patients, templates);
+                
+                if (!safeTemplate) {
+                    console.log(`[CRON INFO] IA não encontrou mensagem segura para ${schedule.patients.name}. Pulando este ciclo.`);
+                    continue;
+                }
+
+                content = safeTemplate.content;
+                title = safeTemplate.title;
+            } else {
+                // Mensagem Fixa (Padrão atual)
+                if (!schedule.health_templates) {
+                    console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template vinculado.`);
+                    continue;
+                }
+                content = schedule.health_templates.content;
+                title = schedule.health_templates.title;
+            }
             
             // Formatando o número para o padrão do WhatsApp Web JS (DDD + Numero + @c.us)
             // Assumindo que o phone_number já está salvo corretamente ou precisa de ajuste
@@ -107,7 +146,7 @@ async function processScheduledMessages(whatsappClient) {
             }
 
             // Preparando a mensagem com o título da campanha
-            const messageToSend = `🩺 *Mensagem da Equipe de Saúde*\n*Assunto:* ${schedule.health_templates.title}\n\nOlá, ${schedule.patients.name.split(' ')[0]}!\n\n${content}\n\n_Esta é uma mensagem automática programada pelo seu Agente Comunitário de Saúde._`;
+            const messageToSend = `🩺 *Mensagem da Equipe de Saúde*\n*Assunto:* ${title}\n\nOlá, ${schedule.patients.name.split(' ')[0]}!\n\n${content}\n\n_Esta é uma mensagem automática programada pelo seu Agente Comunitário de Saúde._`;
 
             // Enviar via WhatsApp
             await whatsappClient.sendMessage(formattedNumber, messageToSend);
