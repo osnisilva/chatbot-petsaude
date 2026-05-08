@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import UbsFilter from './components/UbsFilter';
 import EngagementTable from './components/EngagementTable';
 
@@ -241,9 +242,9 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
-          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2">Em Atendimento</h3>
+        <Link href="/dashboard/chat" className="block bg-white p-8 rounded-3xl shadow-[0_8px_30_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-rose-200 hover:shadow-lg transition-all duration-300">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-bl-full -z-10 group-hover:scale-110 group-hover:bg-rose-100 transition-all duration-500"></div>
+          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2 group-hover:text-rose-600 transition-colors">Em Atendimento</h3>
           <p className="text-5xl font-black text-slate-800">{waitingAcs || 0}</p>
           <div className="mt-4 flex items-center gap-2">
               <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${waitingAcs && waitingAcs > 0 ? 'bg-rose-100 text-rose-700 animate-bounce' : 'bg-slate-100 text-slate-500'}`}>
@@ -251,7 +252,7 @@ export default async function DashboardPage({
               </span>
               <p className="text-slate-400 text-xs font-medium">Atendimentos manuais em andamento</p>
           </div>
-        </div>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
