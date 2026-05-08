@@ -8,31 +8,59 @@ interface PatientCardProps {
   patientId: string;
   patientName: string;
   ubsName: string;
+  comorbidities: string[];
   campaigns: any[];
   templates: any[];
 }
 
-export default function PatientCard({ patientId, patientName, ubsName, campaigns, templates }: PatientCardProps) {
+export default function PatientCard({ patientId, patientName, ubsName, comorbidities, campaigns, templates }: PatientCardProps) {
   const [showModal, setShowModal] = useState(false);
 
+  // Pega as iniciais para o avatar
+  const initials = patientName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="font-bold text-lg text-slate-800">{patientName}</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ubsName}</span>
-            <span className="text-slate-200">•</span>
-            <p className="text-[10px] text-slate-300 font-mono">ID: {patientId.substring(0, 8)}...</p>
-          </div>
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all relative group/card">
+      <div className="flex gap-4 items-start mb-6">
+        {/* Avatar com Iniciais */}
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-teal-100 shrink-0">
+          {initials}
         </div>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 p-2 rounded-xl transition-colors flex items-center gap-1 text-xs font-bold"
-          title="Adicionar nova trilha"
-        >
-          <span>➕</span>
-        </button>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="font-bold text-lg text-slate-800 leading-tight truncate">{patientName}</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ubsName}</p>
+            </div>
+            <button 
+              onClick={() => setShowModal(true)}
+              className="bg-slate-50 text-slate-400 hover:bg-emerald-600 hover:text-white p-2 rounded-xl transition-all flex items-center gap-1 text-xs font-bold shrink-0 shadow-sm"
+              title="Adicionar nova trilha"
+            >
+              <span>➕</span>
+            </button>
+          </div>
+
+          {/* Badges de Comorbidades */}
+          {comorbidities && comorbidities.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {comorbidities.map((c, idx) => (
+                <span 
+                  key={idx} 
+                  className="px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-100"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="space-y-3">

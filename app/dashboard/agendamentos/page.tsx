@@ -35,7 +35,7 @@ export default async function AgendamentosPage() {
   let schedulesQuery = supabase.from('scheduled_messages')
     .select(`
       id, patient_id, frequency, next_run_at, status, is_random, category,
-      patient:patient_id(name, ubs:ubs_id(name)),
+      patient:patient_id(name, comorbidities, ubs:ubs_id(name)),
       template:template_id(title, category)
     `)
     .order('next_run_at', { ascending: true });
@@ -53,6 +53,7 @@ export default async function AgendamentosPage() {
       acc[pId] = {
         patientName: (s.patient as any)?.name || 'Paciente Desconhecido',
         ubsName: (s.patient as any)?.ubs?.name || '-',
+        comorbidities: (s.patient as any)?.comorbidities || [],
         campaigns: []
       };
     }
@@ -106,6 +107,7 @@ export default async function AgendamentosPage() {
                     patientId={pId}
                     patientName={group.patientName}
                     ubsName={group.ubsName}
+                    comorbidities={group.comorbidities}
                     campaigns={group.campaigns}
                     templates={templates || []}
                   />
