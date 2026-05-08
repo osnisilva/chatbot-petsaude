@@ -16,6 +16,13 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
     query = query.eq('category', params.category);
   }
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) return null;
+
+  const { data: acsProfile } = await supabase.from('acs').select('role, id').eq('auth_user_id', sessionData.session.user.id).single();
+  const userRole = acsProfile?.role || 'acs';
+  const canManageTemplates = userRole === 'admin_ti' || userRole === 'gerente';
+
   const { data: templates } = await query;
 
   async function createTemplate(formData: FormData) {
@@ -25,7 +32,11 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
     
     if (!session) return;
 
-    const { data: acs } = await supabase.from('acs').select('id').eq('auth_user_id', session.user.id).single();
+    const { data: acs } = await supabase.from('acs').select('id, role').eq('auth_user_id', session.user.id).single();
+    
+    if (!acs || (acs.role !== 'admin_ti' && acs.role !== 'gerente')) {
+      throw new Error("Sem permissão para criar templates.");
+    }
 
     await supabase.from('health_templates').insert({
       category: formData.get('category'),
@@ -39,7 +50,14 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
 
   async function deleteTemplate(formData: FormData) {
     "use server";
-    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data: acs } = await supabase.from('acs').select('role').eq('auth_user_id', session.user.id).single();
+    
+    if (!acs || (acs.role !== 'admin_ti' && acs.role !== 'gerente')) {
+      throw new Error("Sem permissão para excluir templates.");
+    }
+
     const id = formData.get('id');
     if (!id) return;
     await supabase.from('health_templates').delete().eq('id', id);
@@ -85,36 +103,38 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Formulário de Criação */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 h-fit">
-          <h2 className="font-bold text-lg text-slate-800 mb-4">Novo Template</h2>
-          <form action={createTemplate} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Categoria</label>
-              <select name="category" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-700 font-medium appearance-none">
-                <option value="nutricao">Nutrição</option>
-                <option value="educacao_fisica">Educação Física</option>
-                <option value="enfermagem">Enfermagem</option>
-                <option value="psicologia">Psicologia</option>
-                <option value="lembrete_medicamento">Lembrete de Medicamento</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Título (Assunto)</label>
-              <input type="text" name="title" required placeholder="Ex: Benefícios da Caminhada" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-700 font-medium" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mensagem (Corpo do WhatsApp)</label>
-              <textarea name="content" required rows={5} placeholder="Escreva a mensagem que o paciente irá receber..." className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-700 font-medium resize-none"></textarea>
-            </div>
-            <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-2xl shadow-sm transition-colors mt-2">
-              Salvar na Biblioteca
-            </button>
-          </form>
-        </div>
+        {/* Formulário de Criação (Apenas Admin/Gerente) */}
+        {canManageTemplates && (
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 h-fit">
+            <h2 className="font-bold text-lg text-slate-800 mb-4">Novo Template</h2>
+            <form action={createTemplate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Categoria</label>
+                <select name="category" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-700 font-medium appearance-none">
+                  <option value="nutricao">Nutrição</option>
+                  <option value="educacao_fisica">Educação Física</option>
+                  <option value="enfermagem">Enfermagem</option>
+                  <option value="psicologia">Psicologia</option>
+                  <option value="lembrete_medicamento">Lembrete de Medicamento</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Título (Assunto)</label>
+                <input type="text" name="title" required placeholder="Ex: Benefícios da Caminhada" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-700 font-medium" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mensagem (Corpo do WhatsApp)</label>
+                <textarea name="content" required rows={5} placeholder="Escreva a mensagem que o paciente irá receber..." className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-700 font-medium resize-none"></textarea>
+              </div>
+              <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-2xl shadow-sm transition-colors mt-2">
+                Salvar na Biblioteca
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Lista de Templates */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className={`${canManageTemplates ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-4`}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-bold text-lg text-slate-800">Templates Disponíveis</h2>
             <div className="flex gap-2 overflow-x-auto pb-2">
@@ -131,15 +151,16 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
           {templates && templates.length > 0 ? (
             templates.map(template => (
               <div key={template.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-3 group relative overflow-hidden">
-                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                   {/* O botão de Editar poderia abrir um modal, por simplicidade estamos apenas usando o botão Delete por enquanto, ou podemos usar Client Components depois */}
-                   <form action={deleteTemplate}>
-                      <input type="hidden" name="id" value={template.id} />
-                      <button type="submit" title="Excluir Template" className="bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200 p-2 rounded-xl shadow-sm transition-all">
-                        🗑️
-                      </button>
-                   </form>
-                </div>
+                {canManageTemplates && (
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <form action={deleteTemplate}>
+                        <input type="hidden" name="id" value={template.id} />
+                        <button type="submit" title="Excluir Template" className="bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200 p-2 rounded-xl shadow-sm transition-all">
+                          🗑️
+                        </button>
+                     </form>
+                  </div>
+                )}
                 
                 <div className="flex justify-between items-start">
                   <span className={`text-[10px] uppercase tracking-wider px-3 py-1 rounded-full font-bold ${categoryColors[template.category]}`}>
