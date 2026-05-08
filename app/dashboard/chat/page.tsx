@@ -260,7 +260,7 @@ export default function ChatPage() {
             >
               <div className="flex justify-between items-start">
                 <span className="font-bold text-slate-800">{(session.patients as any)?.name || 'Desconhecido'}</span>
-                {session.status === 'escalated' && <span className="bg-rose-100 text-rose-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Aguardando ACS</span>}
+                {session.status === 'escalated' && <span className="bg-amber-100 text-amber-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Em Atendimento</span>}
                 {session.status === 'active' && <span className="bg-sky-100 text-sky-700 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold shadow-sm">Com a IA</span>}
               </div>
               <p className="text-sm text-slate-500 mt-1 font-medium">{session.patients?.phone_number}</p>
