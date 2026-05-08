@@ -2,15 +2,16 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import UbsFilter from './components/UbsFilter';
+import PeriodFilter from './components/PeriodFilter';
 import EngagementTable from './components/EngagementTable';
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ubs?: string }>;
+  searchParams: Promise<{ ubs?: string; period?: string }>;
 }) {
   const supabase = await createClient();
-  const { ubs: ubsParam } = await searchParams;
+  const { ubs: ubsParam, period } = await searchParams;
 
   // 1. Identificar usuário e permissões
   const { data: { session } } = await supabase.auth.getSession();
@@ -52,29 +53,46 @@ export default async function DashboardPage({
     supabase.from('patients').select('*', { count: 'exact', head: true })
   );
 
-  // 2. Atendimentos IA (mensagens do bot hoje)
+  // 2. Cálculo da Data Inicial com base no período
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Nota: messages não tem ubs_id direto, precisamos filtrar por patient_id -> ubs_id
-  // Ou usar a política de RLS que já cuida disso se o selectedUbsId for injetado.
-  // Como estamos no server, vamos fazer um join simples ou subquery se necessário.
-  let messagesQuery = supabase
+  let startDate = today;
+  if (period === '7d') {
+    startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  } else if (period === '30d') {
+    startDate = new Date(today.getFullYear(), today.getMonth(), 1); // Início deste mês
+  } else if (period === 'all') {
+    startDate = new Date(2020, 0, 1); // Data bem antiga
+  }
+
+  // Helper para filtro de UBS nas subqueries
+  const patientUbsFilter = selectedUbsId ? supabase.from('patients').select('id').eq('ubs_id', selectedUbsId) : null;
+
+  // 3. Fluxo de Mensagens (Enviadas e Recebidas no período)
+  let sentQuery = supabase
     .from('messages')
     .select('id', { count: 'exact', head: true })
-    .eq('sender_type', 'bot')
-    .gte('created_at', today.toISOString());
+    .in('sender_type', ['bot', 'acs'])
+    .gte('created_at', startDate.toISOString());
+    
+  let receivedQuery = supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('sender_type', 'patient')
+    .gte('created_at', startDate.toISOString());
   
   if (selectedUbsId) {
-    messagesQuery = messagesQuery.filter('session_id', 'in', 
-        supabase.from('chat_sessions').select('id').filter('patient_id', 'in', 
-            supabase.from('patients').select('id').eq('ubs_id', selectedUbsId)
-        )
-    );
+    const sessionsInUbs = supabase.from('chat_sessions').select('id').filter('patient_id', 'in', patientUbsFilter!);
+    sentQuery = sentQuery.filter('session_id', 'in', sessionsInUbs);
+    receivedQuery = receivedQuery.filter('session_id', 'in', sessionsInUbs);
   }
-  const { count: messagesToday } = await messagesQuery;
+  
+  const { count: messagesSent } = await sentQuery;
+  const { count: messagesReceived } = await receivedQuery;
+  const totalMessages = (messagesSent || 0) + (messagesReceived || 0);
 
-  // 3. Aguardando ACS (Transbordos)
+  // 4. Aguardando ACS (Transbordos)
   let waitingQuery = supabase
     .from('chat_sessions')
     .select('*', { count: 'exact', head: true })
@@ -114,12 +132,19 @@ export default async function DashboardPage({
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
 
-  // 6. Agendamentos de Hoje
+  // 6. Agendamentos do Período
   let scheduledQuery = supabase
     .from('scheduled_messages')
     .select('*', { count: 'exact', head: true })
-    .gte('next_run_at', today.toISOString())
-    .lt('next_run_at', new Date(today.getTime() + 86400000).toISOString());
+    .gte('next_run_at', startDate.toISOString());
+    
+  if (period !== 'all') {
+    let endDate = new Date(today.getTime() + 86400000); // Fim de hoje
+    if (period === '7d') endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    else if (period === '30d') endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+    
+    scheduledQuery = scheduledQuery.lt('next_run_at', endDate.toISOString());
+  }
   
   if (selectedUbsId) {
     scheduledQuery = scheduledQuery.filter('patient_id', 'in', 
@@ -203,13 +228,16 @@ export default async function DashboardPage({
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-            {/* Componente de Filtro */}
+            {/* Componente de Filtro de UBS */}
             <UbsFilter 
                 ubsList={ubsList} 
                 currentUbsId={selectedUbsId}
                 currentUbsName={(profile?.ubs as any)?.name}
                 disabled={!isAdmin} 
             />
+
+            {/* Componente de Filtro de Período */}
+            <PeriodFilter currentPeriod={period || null} />
 
             <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 w-full sm:w-auto">
                 <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isBotOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
@@ -234,11 +262,17 @@ export default async function DashboardPage({
 
         <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
-          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2">Respostas da IA (Hoje)</h3>
-          <p className="text-5xl font-black text-slate-800">{messagesToday || 0}</p>
-          <div className="mt-4 flex items-center gap-2">
-              <span className="bg-teal-100 text-teal-700 text-[10px] font-bold px-2 py-1 rounded-lg">ECONOMIA DE TEMPO</span>
-              <p className="text-slate-400 text-xs font-medium">Atendimentos automatizados</p>
+          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2">Fluxo de Mensagens</h3>
+          <p className="text-5xl font-black text-slate-800">{totalMessages}</p>
+          <div className="mt-4 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                  <span className="bg-teal-100 text-teal-700 text-[10px] font-bold px-2 py-0.5 rounded-md w-16 text-center">ENVIADAS</span>
+                  <p className="text-slate-500 text-xs font-bold">{messagesSent || 0}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                  <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md w-16 text-center">RECEBIDAS</span>
+                  <p className="text-slate-500 text-xs font-bold">{messagesReceived || 0}</p>
+              </div>
           </div>
         </div>
 
