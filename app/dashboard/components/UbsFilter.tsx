@@ -25,15 +25,15 @@ export default function UbsFilter({ ubsList, currentUbsId, currentUbsName, disab
   };
 
   return (
-    <div className="relative w-full sm:w-64">
+    <div className="relative w-full sm:w-auto sm:min-w-[300px] sm:max-w-[400px]">
       <select
         disabled={disabled}
         value={currentUbsId || ''}
         onChange={(e) => handleUbsChange(e.target.value)}
         className={`
-          w-full px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm 
+          w-full pl-4 pr-12 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm 
           text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-teal-500 
-          appearance-none cursor-pointer transition-all
+          appearance-none cursor-pointer transition-all truncate
           ${disabled ? 'opacity-70 bg-slate-50 cursor-not-allowed' : 'hover:border-teal-200'}
         `}
       >
