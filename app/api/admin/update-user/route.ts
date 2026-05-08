@@ -5,8 +5,8 @@ export async function POST(request: Request) {
   try {
     const { id, auth_user_id, name, email, password, role, ubs_id, microarea, phone_number, cns } = await request.json();
 
-    if (!id || !auth_user_id) {
-      return NextResponse.json({ error: 'IDs do profissional e auth são obrigatórios' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'ID do profissional é obrigatório' }, { status: 400 });
     }
 
     const supabaseAdmin = createClient(
@@ -17,17 +17,19 @@ export async function POST(request: Request) {
       }
     );
 
-    // 1. Atualizar Auth (E-mail e Senha)
-    const authUpdateData: any = {};
-    if (email) authUpdateData.email = email;
-    if (password) authUpdateData.password = password;
+    // 1. Atualizar Auth (E-mail e Senha) - Apenas se o profissional tiver uma conta vinculada
+    if (auth_user_id) {
+      const authUpdateData: any = {};
+      if (email) authUpdateData.email = email;
+      if (password) authUpdateData.password = password;
 
-    if (Object.keys(authUpdateData).length > 0) {
-      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-        auth_user_id,
-        authUpdateData
-      );
-      if (authError) throw authError;
+      if (Object.keys(authUpdateData).length > 0) {
+        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+          auth_user_id,
+          authUpdateData
+        );
+        if (authError) throw authError;
+      }
     }
 
     // 2. Atualizar Banco (Tabela acs) - AGORA COM EMAIL!
