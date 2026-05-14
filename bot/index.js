@@ -118,11 +118,12 @@ client.on('message', async (message) => {
 
     const messageText = message.body;
 
-    // --- NOVA TRAVA DE HORÁRIO (08:00 - 18:00) ---
-    const now = new Date();
-    const hour = now.getHours();
-    if (hour < 8 || hour >= 18) {
-        console.log(`[Horário] Mensagem de ${phoneNumber} fora do horário (${hour}h). Enviando aviso.`);
+    // --- NOVA TRAVA DE HORÁRIO (08:00 - 18:00) - Fuso horário do Brasil ---
+    const options = { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false };
+    const spHour = parseInt(new Intl.DateTimeFormat('pt-BR', options).format(new Date()), 10);
+    
+    if (spHour < 8 || spHour >= 18) {
+        console.log(`[Horário] Mensagem de ${phoneNumber} fora do horário (${spHour}h Brasília). Enviando aviso.`);
         const outOfOfficeMsg = `Olá! O atendimento automatizado da Secretaria de Saúde funciona de segunda a sexta, das *08h às 18h*.\n\nSua mensagem foi recebida e será processada no próximo período de atendimento.\n\n🚨 *Em caso de emergência:* Procure a UPA mais próxima ou ligue para o SAMU no número *192*.`;
         
         messageQueue.push({ messageObj: message, replyText: outOfOfficeMsg });
