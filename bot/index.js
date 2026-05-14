@@ -51,11 +51,19 @@ async function processQueue() {
     processQueue();
 }
 
-// Inicializa o Cliente do WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth(), // Salva a sessão localmente (não precisa reler QR Code ao reiniciar)
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'] // Necessário para rodar em VPS Linux (Google Cloud)
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', // Reduz drasticamente o consumo de RAM
+            '--disable-gpu'
+        ]
     }
 });
 
