@@ -265,6 +265,42 @@ Exemplo de transferência:
     }
 });
 
+// Função robusta para processar o envio de mensagens do ACS
+async function processAcsMessage(msg) {
+    if (msg.whatsapp_message_id) return; // Já foi enviado/processado
+
+    try {
+        const { data: session } = await supabase.from('chat_sessions').select('patient_id').eq('id', msg.session_id).single();
+        if (session) {
+            const { data: patient } = await supabase.from('patients').select('phone_number').eq('id', session.patient_id).single();
+            if (patient) {
+                // Se o número não começar com '55' e for longo (ex: LID do WhatsApp), envia para @lid
+                const isLid = !patient.phone_number.startsWith('55') && patient.phone_number.length >= 14;
+                const chatId = isLid ? `${patient.phone_number}@lid` : `${patient.phone_number}@c.us`;
+                let sentMsg;
+                
+                if (msg.media_url) {
+                    console.log(`📎 Enviando arquivo do ACS para ${patient.phone_number}: ${msg.media_name}`);
+                    const media = await MessageMedia.fromUrl(msg.media_url);
+                    sentMsg = await client.sendMessage(chatId, media, { caption: msg.content });
+                } else {
+                    console.log(`👨‍⚕️ Disparando resposta do ACS para ${patient.phone_number}: ${msg.content}`);
+                    sentMsg = await client.sendMessage(chatId, msg.content);
+                }
+
+                // Salva o ID do WhatsApp no banco para não processar de novo
+                if (sentMsg && sentMsg.id && sentMsg.id._serialized) {
+                    await supabase.from('messages')
+                        .update({ whatsapp_message_id: sentMsg.id._serialized, status: 'sent' })
+                        .eq('id', msg.id);
+                }
+            }
+        }
+    } catch (err) {
+        console.error("Erro ao enviar mensagem do ACS:", err);
+    }
+}
+
 // Escuta o banco de dados por ações do ACS no painel (Envio, Edição, Remoção)
 supabase.channel('acs_actions')
     .on('postgres_changes', { 
@@ -273,40 +309,9 @@ supabase.channel('acs_actions')
         table: 'messages',
         filter: "sender_type=eq.acs"
     }, async (payload) => {
-        const msg = payload.new;
-        if (msg.whatsapp_message_id) return; // Já foi enviado/processado
-
-        try {
-            const { data: session } = await supabase.from('chat_sessions').select('patient_id').eq('id', msg.session_id).single();
-            if (session) {
-                const { data: patient } = await supabase.from('patients').select('phone_number').eq('id', session.patient_id).single();
-                if (patient) {
-                    // Se o número não começar com '55' e for longo (ex: LID do WhatsApp), envia para @lid
-                    const isLid = !patient.phone_number.startsWith('55') && patient.phone_number.length >= 14;
-                    const chatId = isLid ? `${patient.phone_number}@lid` : `${patient.phone_number}@c.us`;
-                    let sentMsg;
-                    
-                    if (msg.media_url) {
-                        console.log(`📎 Enviando arquivo do ACS para ${patient.phone_number}: ${msg.media_name}`);
-                        const media = await MessageMedia.fromUrl(msg.media_url);
-                        sentMsg = await client.sendMessage(chatId, media, { caption: msg.content });
-                    } else {
-                        console.log(`👨‍⚕️ Disparando resposta do ACS para ${patient.phone_number}: ${msg.content}`);
-                        sentMsg = await client.sendMessage(chatId, msg.content);
-                    }
-
-                    // Salva o ID do WhatsApp no banco para futuras edições/exclusões
-                    if (sentMsg && sentMsg.id && sentMsg.id._serialized) {
-                        await supabase.from('messages')
-                            .update({ whatsapp_message_id: sentMsg.id._serialized, status: 'sent' })
-                            .eq('id', msg.id);
-                    }
-                }
-            }
-        } catch (err) {
-            console.error("Erro ao enviar mensagem do ACS:", err);
-        }
+        await processAcsMessage(payload.new);
     })
+
     .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -354,6 +359,26 @@ client.on('message_ack', async (msg, ack) => {
             .eq('whatsapp_message_id', msg.id._serialized);
     }
 });
+
+// Polling robusto para garantir que nenhuma mensagem seja perdida (ex: se o websocket falhar)
+setInterval(async () => {
+    try {
+        const { data: pendingMessages } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('sender_type', 'acs')
+            .is('whatsapp_message_id', null)
+            .order('created_at', { ascending: true });
+
+        if (pendingMessages && pendingMessages.length > 0) {
+            for (const msg of pendingMessages) {
+                await processAcsMessage(msg);
+            }
+        }
+    } catch (err) {
+        console.error("Erro no polling de mensagens pendentes:", err.message);
+    }
+}, 10000); // Roda a cada 10 segundos
 
 // Inicializa
 console.log("Iniciando o cliente do WhatsApp Web...");
