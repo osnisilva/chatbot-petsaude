@@ -63,9 +63,13 @@ export default function ChatPage() {
     }
     fetchSessions();
 
-    // Atualização em tempo real das sessões
+    // Atualização em tempo real das sessões (escuta tanto a tabela de sessões quanto a de mensagens)
     const channel = supabase.channel('sessions_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_sessions' }, () => {
+        fetchSessions();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        // Fallback garantido: se uma nova mensagem chegar, atualiza a lista de atendimentos
         fetchSessions();
       })
       .subscribe();
