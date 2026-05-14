@@ -113,9 +113,9 @@ client.on('message', async (message) => {
         let replyText = '';
 
         if (!patient) {
-            console.log('Paciente não encontrado localmente. Consultando mock do e-SUS...');
-            // Resposta de "primeiro acesso"
-            replyText = `Olá! Bem-vindo ao atendimento da Secretaria de Saúde. Percebemos que é o seu primeiro acesso conosco. Aguarde um instante enquanto sincronizamos seus dados.`;
+            console.log('Paciente não encontrado localmente. Enviando aviso para ir à UBS...');
+            // Resposta de "primeiro acesso / não cadastrado"
+            replyText = `Olá! Bem-vindo ao atendimento automatizado da Secretaria de Saúde.\n\nNão encontramos o seu cadastro no nosso sistema. Por favor, dirija-se até a Unidade de Saúde (UBS) do seu bairro para realizar ou atualizar o seu cadastro.\n\nApós a atualização presencial, você poderá utilizar este canal normalmente!`;
         } else {
             // Verificação de Consentimento LGPD
             const userMsgUpper = messageText.trim().toUpperCase();
