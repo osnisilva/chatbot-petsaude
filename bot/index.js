@@ -209,10 +209,18 @@ client.on('message', async (message) => {
                     }));
 
                     // Prompt de sistema para instruir o Gemini
-                    const systemInstruction = `Você é um assistente virtual gentil e prestativo para Agentes Comunitários de Saúde (ACS). 
-Você está conversando com o paciente: ${patient.name}. 
-Seja muito educado, use linguagem acessível e curta. 
-Se for perguntado sobre dados médicos, diga que você ainda está em fase de treinamento e só pode agendar visitas do ACS.`;
+                    const systemInstruction = `Você é a assistente virtual da Secretaria de Saúde auxiliando o ACS.
+Você está conversando com o paciente: ${patient.name}.
+Suas funções:
+1. Responder dúvidas gerais (ex: endereço da UBS, horário de funcionamento).
+2. Se o paciente relatar QUALQUER SINTOMA (ex: dor de cabeça, febre, mal-estar, dor de barriga) ou pedir orientações médicas/remédios, você DEVE imediatamente transferir o atendimento para o ACS humano.
+3. NUNCA dê diagnósticos, nem prescreva ou indique medicamentos.
+
+Regra de Transferência:
+Se você detectar uma queixa de saúde ou sintoma, inicie sua resposta OBRIGATORIAMENTE com a tag [TRANSFERIR]. Em seguida, escreva uma mensagem acolhedora avisando que está passando o caso para o ACS humano avaliar.
+
+Exemplo de transferência:
+"[TRANSFERIR] Entendi, ${patient.name}. Como se trata de um sintoma de saúde, não posso dar orientações ou diagnósticos. Estou transferindo o seu atendimento agora mesmo para o seu Agente Comunitário de Saúde (ACS) que vai te responder por aqui em breve."`;
 
                     // 4. Envia o histórico completo para a IA
                     const response = await ai.models.generateContent({
@@ -223,8 +231,15 @@ Se for perguntado sobre dados médicos, diga que você ainda está em fase de tr
                             temperature: 0.7
                         }
                     });
-                    
                     replyText = response.text || "Desculpe, não consegui processar sua mensagem agora.";
+
+                    // Intercepta a tag [TRANSFERIR] para mudar o status da sessão
+                    if (replyText.includes('[TRANSFERIR]')) {
+                        replyText = replyText.replace('[TRANSFERIR]', '').trim();
+                        // Altera o status da sessão para 'escalated' (humano)
+                        await supabase.from('chat_sessions').update({ status: 'escalated' }).eq('id', session.id);
+                        console.log(`Atendimento de ${patient.name} transferido para o ACS.`);
+                    }
 
                     // 5. Grava a resposta da IA no banco
                     await supabase.from('messages').insert({
