@@ -281,7 +281,9 @@ supabase.channel('acs_actions')
             if (session) {
                 const { data: patient } = await supabase.from('patients').select('phone_number').eq('id', session.patient_id).single();
                 if (patient) {
-                    const chatId = `${patient.phone_number}@c.us`;
+                    // Se o número não começar com '55' e for longo (ex: LID do WhatsApp), envia para @lid
+                    const isLid = !patient.phone_number.startsWith('55') && patient.phone_number.length >= 14;
+                    const chatId = isLid ? `${patient.phone_number}@lid` : `${patient.phone_number}@c.us`;
                     let sentMsg;
                     
                     if (msg.media_url) {
