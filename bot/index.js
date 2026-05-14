@@ -73,9 +73,27 @@ client.on('qr', (qr) => {
     console.log("👆 Escaneie o QR Code acima usando o WhatsApp da Secretaria de Saúde.");
 });
 
-client.on('ready', () => {
-    console.log('🤖 Bot do WhatsApp conectado e pronto para uso!');
+client.on('ready', async () => {
+    console.log('📱 Bot do WhatsApp conectado e pronto para uso!');
     
+    try {
+        // Tenta processar mensagens perdidas durante o tempo que o bot esteve offline (restart)
+        const chats = await client.getChats();
+        for (const chat of chats) {
+            if (chat.unreadCount > 0) {
+                const messages = await chat.fetchMessages({ limit: chat.unreadCount });
+                for (const msg of messages) {
+                    if (!msg.fromMe) {
+                        // Simula o evento de nova mensagem para ser processada pela fila do bot
+                        client.emit('message', msg);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.log('Erro ao buscar mensagens não lidas no startup:', err.message);
+    }
+
     // Iniciar serviço de disparos programados (Trilhas de Cuidado)
     initCronJobs(client);
 });
