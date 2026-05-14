@@ -84,7 +84,20 @@ client.on('message', async (message) => {
     // Ignorar mensagens de grupos ou do próprio bot
     if (message.isGroupMsg || message.fromMe) return;
 
-    const phoneNumber = message.from.replace('@c.us', '');
+    let phoneNumber = message.from.replace('@c.us', '').replace('@s.whatsapp.net', '');
+    
+    // Tratamento para nova API do WhatsApp que às vezes retorna @lid (Linked Device) em vez do número real
+    if (phoneNumber.includes('@lid')) {
+        try {
+            const contact = await message.getContact();
+            if (contact && contact.number) {
+                phoneNumber = contact.number;
+            }
+        } catch (e) {
+            console.error('Erro ao buscar contato do @lid:', e);
+        }
+    }
+
     const messageText = message.body;
 
     // --- NOVA TRAVA DE HORÁRIO (08:00 - 18:00) ---
