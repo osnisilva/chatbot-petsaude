@@ -216,7 +216,7 @@ Se for perguntado sobre dados médicos, diga que você ainda está em fase de tr
 
                     // 4. Envia o histórico completo para a IA
                     const response = await ai.models.generateContent({
-                        model: 'gemini-1.5-flash',
+                        model: 'gemini-3-flash-preview',
                         contents: chatHistory,
                         config: {
                             systemInstruction: systemInstruction,
