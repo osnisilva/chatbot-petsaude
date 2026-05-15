@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { deleteScheduleAction } from './actions';
+import { deleteScheduleAction, deleteAllSchedulesForPatientAction } from './actions';
 import AddTrailModal from './AddTrailModal';
 
 interface PatientCardProps {
@@ -33,18 +33,31 @@ export default function PatientCard({ patientId, patientName, ubsName, comorbidi
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-start">
-            <div>
+          <div className="flex justify-between items-start gap-2">
+            <div className="flex-1 min-w-0">
               <h3 className="font-bold text-lg text-slate-800 leading-tight truncate">{patientName}</h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ubsName}</p>
             </div>
-            <button 
-              onClick={() => setShowModal(true)}
-              className="bg-slate-50 text-slate-400 hover:bg-emerald-600 hover:text-white p-2 rounded-xl transition-all flex items-center gap-1 text-xs font-bold shrink-0 shadow-sm"
-              title="Adicionar nova trilha"
-            >
-              <span>➕</span>
-            </button>
+            <div className="flex gap-2 shrink-0">
+              <button 
+                onClick={() => setShowModal(true)}
+                className="bg-slate-50 text-slate-400 hover:bg-emerald-600 hover:text-white p-2 rounded-xl transition-all flex items-center justify-center text-xs font-bold shadow-sm"
+                title="Adicionar nova trilha"
+              >
+                ➕
+              </button>
+              <button 
+                onClick={async () => {
+                  if (confirm("Deseja realmente remover o paciente do acompanhamento? Todas as trilhas ativas dele serão canceladas.")) {
+                    await deleteAllSchedulesForPatientAction(patientId);
+                  }
+                }}
+                className="bg-slate-50 text-slate-400 hover:bg-rose-600 hover:text-white p-2 rounded-xl transition-all flex items-center justify-center text-xs font-bold shadow-sm"
+                title="Remover paciente do acompanhamento (Excluir todas as trilhas)"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
 
           {/* Badges de Comorbidades */}

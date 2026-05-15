@@ -34,6 +34,7 @@ CREATE TABLE public.patients (
     ubs_id UUID REFERENCES public.ubs(id) NOT NULL,
     birth_date DATE, -- Importado do e-SUS
     gender TEXT, -- M, F, Outro
+    comorbidities TEXT[], -- Array de comorbidades (Ex: ['Diabetes', 'Hipertensão']) - e-SUS
     lgpd_consent BOOLEAN DEFAULT NULL, -- NULL (Pendente), TRUE (Aceito), FALSE (Recusado)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

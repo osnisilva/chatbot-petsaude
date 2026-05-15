@@ -53,3 +53,18 @@ export async function deleteScheduleAction(scheduleId: string) {
     return { success: false, error: err.message };
   }
 }
+
+export async function deleteAllSchedulesForPatientAction(patientId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
+    await supabase.from('scheduled_messages').delete().eq('patient_id', patientId);
+    revalidatePath('/dashboard/agendamentos');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Erro ao excluir acompanhamento do paciente:', err.message);
+    return { success: false, error: err.message };
+  }
+}

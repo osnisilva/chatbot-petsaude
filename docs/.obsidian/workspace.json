@@ -1,0 +1,198 @@
+{
+  "main": {
+    "id": "8d69111bc1e2e0fb",
+    "type": "split",
+    "children": [
+      {
+        "id": "0d75050b550d0ee1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4951aa06d1aa741e",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Visualização em gráfico"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "89e6ec3a6942eeb3",
+    "type": "split",
+    "children": [
+      {
+        "id": "cecea0dd55f198ef",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "aef2e2aa2eb463d6",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "baf24d90fd972be0",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "11ea31831c85e185",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "e470b53bfff9d886",
+    "type": "split",
+    "children": [
+      {
+        "id": "ff52184a8c900b82",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9ea7dbfffa63c32c",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "03-Manuais/Configuracao-do-Ambiente.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos para Configuracao-do-Ambiente"
+            }
+          },
+          {
+            "id": "ec8ab3827a4aaf1a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "03-Manuais/Configuracao-do-Ambiente.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída para Configuracao-do-Ambiente"
+            }
+          },
+          {
+            "id": "aaa2b59e0bbc2ea8",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "c8a7b78da688e748",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "27e0f90b686eaa3f",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "03-Manuais/Configuracao-do-Ambiente.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário de Configuracao-do-Ambiente"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "4951aa06d1aa741e",
+  "lastOpenFiles": [
+    "04-Manuais/Perfis-de-Acesso.md",
+    "04-Manuais/Configuracao-do-Ambiente.md",
+    "03-Banco-de-Dados/Seguranca-e-RLS.md",
+    "03-Banco-de-Dados/Esquema.md",
+    "02-Funcionalidades/Trilhas-de-Cuidado.md",
+    "02-Funcionalidades/Painel-Dashboard.md",
+    "02-Funcionalidades/Chat-e-Mensageria.md",
+    "00-Home.md",
+    "01-Arquitetura/Backend.md",
+    "01-Arquitetura/Bot-WhatsApp.md",
+    "01-Arquitetura/Frontend.md",
+    "03-Manuais/Configuracao-do-Ambiente.md",
+    "03-Manuais/Perfis-de-Acesso.md"
+  ]
+}
