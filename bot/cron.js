@@ -50,7 +50,7 @@ async function processScheduledMessages(whatsappClient) {
             template_id,
             is_random,
             category,
-            patients ( phone_number, name, comorbidities ),
+            patients ( phone_number, name, comorbidities, lgpd_consent ),
             health_templates ( title, category, content )
         `)
         .eq('status', 'active')
@@ -96,6 +96,11 @@ async function processScheduledMessages(whatsappClient) {
 
     for (const schedule of batch) {
         try {
+            if (schedule.patients.lgpd_consent === false) {
+                console.log(`[CRON INFO] Paciente ${schedule.patients.name} optou por sair (LGPD). Pulando envio.`);
+                continue;
+            }
+
             const phoneNumber = schedule.patients.phone_number;
             let content = '';
             let title = '';
@@ -146,7 +151,7 @@ async function processScheduledMessages(whatsappClient) {
             }
 
             // Preparando a mensagem com o título da campanha
-            const messageToSend = `🩺 *Mensagem da Equipe de Saúde*\n*Assunto:* ${title}\n\nOlá, ${schedule.patients.name.split(' ')[0]}!\n\n${content}\n\n_Esta é uma mensagem automática programada pelo seu Agente Comunitário de Saúde._`;
+            const messageToSend = `🩺 *Mensagem da Equipe de Saúde*\n*Assunto:* ${title}\n\nOlá, ${schedule.patients.name.split(' ')[0]}!\n\n${content}\n\n_Esta é uma mensagem automática programada pelo seu Agente Comunitário de Saúde. Para parar de receber estes avisos, responda *SAIR*._`;
 
             // Enviar via WhatsApp
             await whatsappClient.sendMessage(formattedNumber, messageToSend);

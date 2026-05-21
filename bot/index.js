@@ -170,10 +170,14 @@ client.on('message', async (message) => {
                     replyText = `Você optou por não utilizar o atendimento automatizado. Caso mude de ideia e queira ser atendido, digite *ACEITO*.`;
                 }
             } else {
-                // Fluxo normal da IA para pacientes que já deram consentimento (lgpd_consent === true)
-                console.log(`Paciente ${patient.name} encontrado e validado. Consultando IA Gemini...`);
-                
-                try {
+                // Fluxo normal para pacientes que já deram consentimento (lgpd_consent === true)
+                if (userMsgUpper === 'SAIR' || userMsgUpper === 'CANCELAR') {
+                    await supabase.from('patients').update({ lgpd_consent: false }).eq('id', patient.id);
+                    replyText = `❌ *Atendimento Cancelado*\nEntendido. Você não receberá mais os avisos de saúde e o atendimento automatizado foi desativado.\n\nPara voltar a usar o serviço no futuro, digite *ACEITO*.`;
+                } else {
+                    console.log(`Paciente ${patient.name} encontrado e validado. Consultando IA Gemini...`);
+                    
+                    try {
                     // 1. Busca ou cria sessão (ativa ou escalada)
                     let { data: session } = await supabase
                         .from('chat_sessions')
@@ -272,8 +276,9 @@ Exemplo de transferência:
                     console.error("Erro na lógica de IA/Banco:", aiError);
                     replyText = `Olá, ${patient.name}! Recebi sua mensagem, mas nosso cérebro artificial está temporariamente fora do ar.`;
                 }
-            }
-        }
+            } // fecha o else do opt-out
+        } // fecha o fluxo normal (else lgpd_consent === true)
+    } // fecha o else (!patient)
 
         // 2. Coloca a resposta na Fila Anti-Spam
         messageQueue.push({ messageObj: message, replyText });
