@@ -91,8 +91,8 @@ async function processScheduledMessages(whatsappClient) {
 
     console.log(`[CRON] Disparando ${schedulesToSend.length} campanhas na janela de horário atual.`);
 
-    // Limite anti-banimento: Processar no máximo 20 por ciclo
-    const batch = schedulesToSend.slice(0, 20);
+    // Limite anti-banimento (MODO TESTE): Processar no máximo 1 por ciclo
+    const batch = schedulesToSend.slice(0, 1);
 
     for (const schedule of batch) {
         try {

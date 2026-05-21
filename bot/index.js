@@ -94,8 +94,12 @@ client.on('ready', async () => {
         console.log('Erro ao buscar mensagens não lidas no startup:', err.message);
     }
 
-    // Iniciar serviço de disparos programados (Trilhas de Cuidado)
-    initCronJobs(client);
+    // Iniciar serviço de disparos programados (Trilhas de Cuidado) apenas se habilitado
+    if (process.env.ENABLE_CRON === 'true') {
+        initCronJobs(client);
+    } else {
+        console.log('⏳ [MODO TESTE] O Despertador (Cron) de Trilhas de Cuidado está DESLIGADO. Mude ENABLE_CRON para true no .env.local para ligar.');
+    }
 });
 
 client.on('message', async (message) => {
@@ -395,9 +399,9 @@ setInterval(async () => {
             .order('created_at', { ascending: true });
 
         if (pendingMessages && pendingMessages.length > 0) {
-            for (const msg of pendingMessages) {
-                await processAcsMessage(msg);
-            }
+            // Modo Teste: Processa apenas 1 mensagem a cada 10 segundos para simular digitação humana
+            const msg = pendingMessages[0];
+            await processAcsMessage(msg);
         }
     } catch (err) {
         console.error("Erro no polling de mensagens pendentes:", err.message);
