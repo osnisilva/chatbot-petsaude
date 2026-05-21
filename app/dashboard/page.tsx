@@ -315,7 +315,7 @@ export default async function DashboardPage({
           </div>
         </Link>
 
-        <Link href="/dashboard/pacientes?buscaAtiva=true" className="block bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-amber-200 hover:shadow-lg transition-all duration-300">
+        <Link href={`/dashboard/pacientes?buscaAtiva=true${selectedUbsId ? `&ubsId=${selectedUbsId}` : ''}`} className="block bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-amber-200 hover:shadow-lg transition-all duration-300">
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-50 to-rose-50 rounded-bl-full -z-10 group-hover:scale-110 transition-all duration-500"></div>
           <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2 group-hover:text-amber-600 transition-colors">Busca Ativa</h3>
           <p className="text-5xl font-black text-slate-800">{countActiveSearch}</p>

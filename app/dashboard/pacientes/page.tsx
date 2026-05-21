@@ -59,11 +59,15 @@ export default function PacientesPage() {
         setUbsList(ubsData);
       }
 
-      // Verificar parâmetro na URL para ativar a Busca Ativa de imediato
+      // Verificar parâmetros na URL para ativar Busca Ativa e filtrar por UBS
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('buscaAtiva') === 'true') {
           setBuscaAtivaEnabled(true);
+        }
+        const ubsIdFromUrl = urlParams.get('ubsId');
+        if (ubsIdFromUrl) {
+          setSelectedUbs(ubsIdFromUrl);
         }
       }
 
