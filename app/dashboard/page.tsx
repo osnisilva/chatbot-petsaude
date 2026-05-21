@@ -164,6 +164,33 @@ export default async function DashboardPage({
 
   const isBotOnline = lastBotMsg ? (new Date().getTime() - new Date(lastBotMsg.created_at).getTime() < 7200000) : false;
 
+  // 7.5. Busca Ativa: Pacientes com comorbidades sem contato há mais de 30 dias (ou sem qualquer contato)
+  let activeSearchQuery = supabase
+    .from('patients')
+    .select('id, comorbidities, chat_sessions(updated_at)');
+  
+  if (selectedUbsId) {
+    activeSearchQuery = activeSearchQuery.eq('ubs_id', selectedUbsId);
+  }
+  
+  const { data: activeSearchPatients } = await activeSearchQuery;
+  
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const countActiveSearch = activeSearchPatients?.filter(p => {
+    // Deve possuir comorbidades
+    if (!p.comorbidities || p.comorbidities.length === 0) return false;
+    
+    const sessions = p.chat_sessions as any[];
+    // Se não tiver nenhuma sessão de chat, nunca foi contatado (busca ativa necessária)
+    if (!sessions || sessions.length === 0) return true;
+    
+    // Pega a última atualização entre as sessões
+    const lastUpdate = Math.max(...sessions.map(s => new Date(s.updated_at).getTime()));
+    return lastUpdate < thirtyDaysAgo.getTime();
+  }).length || 0;
+
   // 8. Dados de Engajamento por ACS (Apenas para Gestores)
   let engagementData: any[] = [];
   if (isAdmin || isManager) {
@@ -249,7 +276,7 @@ export default async function DashboardPage({
       </div>
       
       {/* Cards Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <div className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
           <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2">Pacientes na Base</h3>
@@ -285,6 +312,18 @@ export default async function DashboardPage({
                   {waitingAcs && waitingAcs > 0 ? 'URGENTE' : 'ESTÁVEL'}
               </span>
               <p className="text-slate-400 text-xs font-medium">Atendimentos manuais em andamento</p>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/pacientes?buscaAtiva=true" className="block bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden group cursor-pointer hover:border-amber-200 hover:shadow-lg transition-all duration-300">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-50 to-rose-50 rounded-bl-full -z-10 group-hover:scale-110 transition-all duration-500"></div>
+          <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest mb-2 group-hover:text-amber-600 transition-colors">Busca Ativa</h3>
+          <p className="text-5xl font-black text-slate-800">{countActiveSearch}</p>
+          <div className="mt-4 flex items-center gap-2">
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${countActiveSearch > 0 ? 'bg-amber-100 text-amber-700 animate-pulse' : 'bg-slate-100 text-slate-500'}`}>
+                  {countActiveSearch > 0 ? 'PENDENTE' : 'EM DIA'}
+              </span>
+              <p className="text-slate-400 text-xs font-medium">Inativos há &gt;30 dias</p>
           </div>
         </Link>
       </div>

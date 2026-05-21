@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Heart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function PacientesPage() {
@@ -14,6 +14,11 @@ export default function PacientesPage() {
   const [selectedUbs, setSelectedUbs] = useState('all');
   const [userRole, setUserRole] = useState('acs');
   const [ubsList, setUbsList] = useState<any[]>([]);
+
+  // Estados específicos para a Busca Ativa
+  const [buscaAtivaEnabled, setBuscaAtivaEnabled] = useState(false);
+  const [selectedComorbidade, setSelectedComorbidade] = useState('all');
+  const [semContatoPeriod, setSemContatoPeriod] = useState('30'); // '15', '30', '60', 'never'
 
   useEffect(() => {
     async function fetchData() {
@@ -30,12 +35,13 @@ export default function PacientesPage() {
         }
       }
 
-      // Buscar pacientes
+      // Buscar pacientes com sessões de chat incluídas para calcular último contato
       const { data, error } = await supabase
         .from('patients')
         .select(`
           id, name, phone_number, cns_masked, lgpd_consent, comorbidities,
-          ubs:ubs_id (id, name)
+          ubs:ubs_id (id, name),
+          chat_sessions (updated_at, status)
         `)
         .order('created_at', { ascending: false });
 
@@ -53,11 +59,46 @@ export default function PacientesPage() {
         setUbsList(ubsData);
       }
 
+      // Verificar parâmetro na URL para ativar a Busca Ativa de imediato
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('buscaAtiva') === 'true') {
+          setBuscaAtivaEnabled(true);
+        }
+      }
+
       setLoading(false);
     }
     
     fetchData();
   }, []);
+
+  // Helper para obter informações de inatividade
+  const getDiasSemContato = (paciente: any) => {
+    const sessions = paciente.chat_sessions;
+    if (!sessions || sessions.length === 0) return null;
+    
+    const timestamps = sessions.map((s: any) => new Date(s.updated_at).getTime());
+    const maxTimestamp = Math.max(...timestamps);
+    
+    const diffTime = Math.abs(new Date().getTime() - maxTimestamp);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      dias: diffDays,
+      data: new Date(maxTimestamp).toLocaleDateString('pt-BR')
+    };
+  };
+
+  // Mapeia todas as comorbidades exclusivas dos pacientes para preencher o filtro
+  const uniqueComorbidades = useMemo(() => {
+    const set = new Set<string>();
+    pacientes.forEach(p => {
+      p.comorbidities?.forEach((c: string) => {
+        if (c) set.add(c);
+      });
+    });
+    return Array.from(set).sort();
+  }, [pacientes]);
 
   const filteredPacientes = useMemo(() => {
     return pacientes.filter((p) => {
@@ -69,9 +110,34 @@ export default function PacientesPage() {
         selectedUbs === 'all' || 
         (p.ubs as any)?.id === selectedUbs;
 
-      return matchesSearch && matchesUbs;
+      if (!matchesSearch || !matchesUbs) return false;
+
+      // Filtros do Modo Busca Ativa
+      if (buscaAtivaEnabled) {
+        // 1. Deve ter pelo menos uma comorbidade
+        if (!p.comorbidities || p.comorbidities.length === 0) return false;
+
+        // 2. Filtrar por comorbidade específica se selecionada
+        if (selectedComorbidade !== 'all' && !p.comorbidities.includes(selectedComorbidade)) {
+          return false;
+        }
+
+        // 3. Filtrar por período de inatividade
+        const contato = getDiasSemContato(p);
+        if (semContatoPeriod === 'never') {
+          return contato === null; // Nunca contatado
+        } else {
+          const limitDays = parseInt(semContatoPeriod, 10);
+          if (contato === null) {
+            return true; // Quem nunca foi contatado entra em qualquer período de inatividade
+          }
+          return contato.dias >= limitDays;
+        }
+      }
+
+      return true;
     });
-  }, [pacientes, searchTerm, selectedUbs]);
+  }, [pacientes, searchTerm, selectedUbs, buscaAtivaEnabled, selectedComorbidade, semContatoPeriod]);
 
   return (
     <div className="p-4 md:p-10 h-full overflow-auto">
@@ -120,6 +186,83 @@ export default function PacientesPage() {
         </div>
       </div>
 
+      {/* Painel Elegante de Busca Ativa */}
+      <div className={`mb-8 p-6 rounded-3xl border transition-all duration-300 ${
+        buscaAtivaEnabled 
+          ? 'bg-gradient-to-br from-amber-500/10 to-rose-500/10 border-amber-200 shadow-[0_8px_30px_rgb(245,158,11,0.05)]' 
+          : 'bg-white border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]'
+      }`}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-3 rounded-2xl transition-colors duration-300 ${
+              buscaAtivaEnabled ? 'bg-gradient-to-br from-amber-500 to-rose-500 text-white' : 'bg-slate-100 text-slate-400'
+            }`}>
+              <Heart className={`h-6 w-6 ${buscaAtivaEnabled ? 'animate-pulse' : ''}`} />
+            </div>
+            <div>
+              <h2 className="font-extrabold text-lg text-slate-800">Módulo de Busca Ativa</h2>
+              <p className="text-sm text-slate-500 font-medium">Localize pacientes crônicos sem contato recente no WhatsApp</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 bg-slate-50/50 p-2 rounded-2xl border border-slate-100">
+            <span className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">Modo Busca Ativa</span>
+            <button
+              onClick={() => setBuscaAtivaEnabled(!buscaAtivaEnabled)}
+              className={`w-14 h-8 flex items-center rounded-full p-1 transition-all duration-300 ${
+                buscaAtivaEnabled ? 'bg-gradient-to-r from-amber-500 to-rose-500 justify-end' : 'bg-slate-200 justify-start'
+              }`}
+              id="busca-ativa-toggle"
+            >
+              <span className="bg-white w-6 h-6 rounded-full shadow-md transition-all duration-300"></span>
+            </button>
+          </div>
+        </div>
+
+        {buscaAtivaEnabled && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-amber-200/30">
+            {/* Seletor de Período Sem Contato */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-amber-800 uppercase tracking-widest block">Período Sem Contato</label>
+              <select
+                value={semContatoPeriod}
+                onChange={(e) => setSemContatoPeriod(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-700 font-bold"
+              >
+                <option value="15">Mais de 15 dias</option>
+                <option value="30">Mais de 30 dias (Recomendado)</option>
+                <option value="60">Mais de 60 dias</option>
+                <option value="never">Nunca Contatado</option>
+              </select>
+            </div>
+
+            {/* Seletor de Comorbidade */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-amber-800 uppercase tracking-widest block">Filtrar Comorbidade</label>
+              <select
+                value={selectedComorbidade}
+                onChange={(e) => setSelectedComorbidade(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-700 font-bold capitalize"
+              >
+                <option value="all">Todas as Comorbidades</option>
+                {uniqueComorbidades.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Mini Resumo */}
+            <div className="bg-white/60 border border-amber-200/40 p-4 rounded-2xl flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Atenção Necessária</p>
+                <p className="text-2xl font-black text-amber-900 mt-1">{filteredPacientes.length} Pacientes</p>
+              </div>
+              <span className="text-3xl animate-bounce">🚨</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -128,8 +271,17 @@ export default function PacientesPage() {
                 <th className="p-6 font-bold">Nome Completo</th>
                 <th className="p-6 font-bold">Comorbidades (e-SUS)</th>
                 <th className="p-6 font-bold">WhatsApp</th>
-                <th className="p-6 font-bold">Unidade (UBS)</th>
-                <th className="p-6 font-bold">Termo LGPD</th>
+                {buscaAtivaEnabled ? (
+                  <>
+                    <th className="p-6 font-bold">Inatividade</th>
+                    <th className="p-6 font-bold text-right">Ação</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="p-6 font-bold">Unidade (UBS)</th>
+                    <th className="p-6 font-bold">Termo LGPD</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -140,7 +292,7 @@ export default function PacientesPage() {
               ) : filteredPacientes.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
-                    {pacientes.length === 0 ? 'Nenhum paciente cadastrado.' : 'Nenhum paciente encontrado na pesquisa.'}
+                    {pacientes.length === 0 ? 'Nenhum paciente cadastrado.' : 'Nenhum paciente atende aos critérios de busca selecionados.'}
                   </td>
                 </tr>
               ) : (
@@ -166,12 +318,63 @@ export default function PacientesPage() {
                       )}
                     </td>
                     <td className="p-6 text-slate-500 font-medium">{p.phone_number}</td>
-                    <td className="p-6 text-slate-500">{(p.ubs as any)?.name || '-'}</td>
-                    <td className="p-6">
-                      {p.lgpd_consent === true && <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Aceito</span>}
-                      {p.lgpd_consent === false && <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Recusado</span>}
-                      {p.lgpd_consent === null && <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Pendente</span>}
-                    </td>
+                    
+                    {buscaAtivaEnabled ? (
+                      <>
+                        <td className="p-6">
+                          {(() => {
+                            const contato = getDiasSemContato(p);
+                            if (contato === null) {
+                              return (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold shadow-sm">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                                  Nunca Contatado
+                                </span>
+                              );
+                            }
+                            
+                            // Cores de acordo com a gravidade da inatividade
+                            let colorClass = 'bg-emerald-100 text-emerald-700';
+                            let dotClass = 'bg-emerald-500';
+                            if (contato.dias >= 60) {
+                              colorClass = 'bg-rose-100 text-rose-700';
+                              dotClass = 'bg-rose-500';
+                            } else if (contato.dias >= 30) {
+                              colorClass = 'bg-amber-100 text-amber-700';
+                              dotClass = 'bg-amber-500';
+                            }
+                            
+                            return (
+                              <div>
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${colorClass} shadow-sm`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${dotClass} ${contato.dias >= 30 ? 'animate-pulse' : ''}`}></span>
+                                  Há {contato.dias} {contato.dias === 1 ? 'dia' : 'dias'}
+                                </span>
+                                <p className="text-[10px] text-slate-400 mt-1 font-medium">Última msg: {contato.data}</p>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className="p-6 text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => router.push(`/dashboard/chat?patientId=${p.id}`)}
+                            className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-rose-500 text-white px-4 py-2 rounded-xl text-xs font-black shadow-md hover:shadow-lg hover:from-amber-600 hover:to-rose-600 transition-all duration-300 uppercase tracking-wider"
+                          >
+                            <span>Chamar</span>
+                            <span className="text-[10px]">→</span>
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-6 text-slate-500">{(p.ubs as any)?.name || '-'}</td>
+                        <td className="p-6">
+                          {p.lgpd_consent === true && <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Aceito</span>}
+                          {p.lgpd_consent === false && <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Recusado</span>}
+                          {p.lgpd_consent === null && <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Pendente</span>}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))
               )}
