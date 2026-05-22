@@ -48,10 +48,10 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   // 4. Buscar Agendamentos Ativos (Individuais e de Grupo)
   let schedulesQuery = supabase.from('scheduled_messages')
     .select(`
-      id, patient_id, group_id, frequency, next_run_at, status, is_random, category,
+      id, patient_id, group_id, frequency, next_run_at, status, is_random, category, custom_title, custom_content,
       patient:patient_id(name, comorbidities, ubs:ubs_id(name)),
-      group:group_id(name),
-      template:template_id(title, category)
+      group:group_id(name, patient_group_members(count)),
+      template:template_id(title, category, content)
     `)
     .order('next_run_at', { ascending: true });
 

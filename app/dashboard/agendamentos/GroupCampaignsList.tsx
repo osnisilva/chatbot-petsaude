@@ -56,12 +56,15 @@ export default function GroupCampaignsList({ schedules }: GroupCampaignsListProp
                   </div>
 
                   <h3 className="font-bold text-base text-slate-800 leading-tight mb-1">{groupName}</h3>
+                  <span className="inline-block bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-md mb-2">
+                    {camp.group?.patient_group_members?.[0]?.count || 0} Pacientes
+                  </span>
                   
-                  <div className="text-xs text-slate-600 mt-3 space-y-1">
+                  <div className="text-xs text-slate-600 mt-2 space-y-1">
                     <p className="font-medium flex items-center gap-1.5 text-slate-700">
                       <span>Assunto:</span>
                       <span className="font-bold">
-                        {camp.is_random ? `Trilha Randômica (${camp.category})` : camp.template?.title}
+                        {camp.custom_title || camp.template?.title || (camp.is_random ? `Trilha Randômica (${camp.category})` : 'Campanha')}
                       </span>
                     </p>
                     <p className="flex items-center gap-1.5">
@@ -73,6 +76,15 @@ export default function GroupCampaignsList({ schedules }: GroupCampaignsListProp
                       <span className="font-bold text-slate-800">
                         {new Date(camp.next_run_at).toLocaleDateString('pt-BR')} às {new Date(camp.next_run_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
+                    </p>
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-slate-100 shadow-sm relative overflow-hidden">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Prévia da Mensagem</span>
+                    <p className="text-xs text-slate-600 italic line-clamp-3 leading-relaxed">
+                      {camp.is_random 
+                        ? "✨ O conteúdo será criado dinamicamente e personalizado pela IA no momento do envio." 
+                        : (camp.custom_content || camp.template?.content || "Nenhum conteúdo definido.")}
                     </p>
                   </div>
                 </div>

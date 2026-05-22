@@ -25,8 +25,18 @@ export async function createScheduleAction(formData: FormData) {
     
     // Captura da data programada
     const next_run_at_input = formData.get('next_run_at') as string;
-    if (group_id && !next_run_at_input) {
-      throw new Error("A data e o horário do envio são obrigatórios para campanhas de grupo.");
+    if (group_id) {
+      if (!next_run_at_input) {
+        throw new Error("A data e o horário do envio são obrigatórios para campanhas de grupo.");
+      }
+      const d = new Date(next_run_at_input);
+      if (d.getDay() === 0) {
+        throw new Error("Não é permitido agendar campanhas de grupo aos domingos.");
+      }
+      const hour = d.getHours();
+      if (hour < 8 || hour >= 18) {
+        throw new Error("O horário de agendamento deve estar entre 08:00 e 17:59.");
+      }
     }
     const next_run_at = next_run_at_input ? new Date(next_run_at_input).toISOString() : new Date().toISOString();
 

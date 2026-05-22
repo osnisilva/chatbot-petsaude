@@ -9,7 +9,7 @@ const supabase = createClient(
 );
 
 // Função auxiliar para calcular a próxima data (baseada no momento do envio real)
-function calculateNextRunAt(frequency) {
+function calculateNextRunAt(frequency, isGroup = false) {
     const nextRun = new Date(); // Usa o horário atual em que foi realmente enviado
     switch (frequency) {
         case 'diario':
@@ -27,6 +27,16 @@ function calculateNextRunAt(frequency) {
         default:
             nextRun.setDate(nextRun.getDate() + 1);
     }
+    
+    // Se for individual, não pode cair no sábado nem domingo
+    if (!isGroup) {
+        if (nextRun.getDay() === 6) nextRun.setDate(nextRun.getDate() + 2); // Sábado -> Segunda
+        if (nextRun.getDay() === 0) nextRun.setDate(nextRun.getDate() + 1); // Domingo -> Segunda
+    } else {
+        // Se for grupo, não pode cair no domingo
+        if (nextRun.getDay() === 0) nextRun.setDate(nextRun.getDate() + 1); // Domingo -> Segunda
+    }
+    
     return nextRun.toISOString();
 }
 
@@ -53,9 +63,11 @@ async function sendWhatsAppMessage(whatsappClient, patient, title, content) {
 
 async function processScheduledMessages(whatsappClient) {
     const currentHour = new Date().getHours();
+    const currentDay = new Date().getDay();
     
     // Trava de Segurança Global: O robô só trabalha entre 08:00 e 18:00 (limite estrito)
-    if (currentHour < 8 || currentHour >= 18) {
+    // E nunca trabalha aos domingos (0)
+    if (currentHour < 8 || currentHour >= 18 || currentDay === 0) {
         return;
     }
 
@@ -90,6 +102,11 @@ async function processScheduledMessages(whatsappClient) {
 
     // Filtro Inteligente de Horários por Categoria
     const schedulesToSend = schedules.filter(s => {
+        // Trilhas Individuais (não é grupo) não podem rodar aos sábados (6)
+        if (!s.group_id && currentDay === 6) {
+            return false;
+        }
+
         // Se for fixo, pega a categoria do template vinculado. Se for randômico, usa a categoria do agendamento.
         const cat = s.is_random ? s.category : (s.health_templates?.category);
         
@@ -143,7 +160,7 @@ async function processScheduledMessages(whatsappClient) {
                     const isUnica = schedule.frequency === 'unica';
                     const updateData = isUnica 
                         ? { status: 'completed' } 
-                        : { next_run_at: calculateNextRunAt(schedule.frequency) };
+                        : { next_run_at: calculateNextRunAt(schedule.frequency, !!schedule.group_id) };
                     await supabase
                         .from('scheduled_messages')
                         .update(updateData)
@@ -166,7 +183,7 @@ async function processScheduledMessages(whatsappClient) {
                         const isUnica = schedule.frequency === 'unica';
                         const updateData = isUnica 
                             ? { status: 'completed' } 
-                            : { next_run_at: calculateNextRunAt(schedule.frequency) };
+                            : { next_run_at: calculateNextRunAt(schedule.frequency, !!schedule.group_id) };
                         await supabase
                             .from('scheduled_messages')
                             .update(updateData)
@@ -220,7 +237,7 @@ async function processScheduledMessages(whatsappClient) {
                 const isUnica = schedule.frequency === 'unica';
                 const updateData = isUnica 
                     ? { status: 'completed' } 
-                    : { next_run_at: calculateNextRunAt(schedule.frequency) };
+                    : { next_run_at: calculateNextRunAt(schedule.frequency, !!schedule.group_id) };
                 await supabase
                     .from('scheduled_messages')
                     .update(updateData)
@@ -284,7 +301,7 @@ async function processScheduledMessages(whatsappClient) {
                 const isUnica = schedule.frequency === 'unica';
                 const updateData = isUnica 
                     ? { status: 'completed' } 
-                    : { next_run_at: calculateNextRunAt(schedule.frequency) };
+                    : { next_run_at: calculateNextRunAt(schedule.frequency, !!schedule.group_id) };
                 await supabase
                     .from('scheduled_messages')
                     .update(updateData)

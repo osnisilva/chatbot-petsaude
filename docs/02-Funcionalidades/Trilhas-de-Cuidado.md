@@ -23,6 +23,12 @@ O ACS pode escolher como disparar essas trilhas:
 ## ⚙️ Motor de Agendamento
 O sistema utiliza *Cron Jobs* (`node-cron`) para ler diariamente as trilhas ativas e acionar o bot do WhatsApp, disparando centenas de mensagens de forma distribuída para não sobrecarregar a rede ou ser bloqueado por *spam*.
 
+### ⏰ Restrições de Dias e Horários
+Para respeitar o descanso dos pacientes e normativas de atendimento, o motor opera sob as seguintes regras estritas:
+- **Trilhas Individuais (Acompanhamento):** São enviadas exclusivamente de **Segunda a Sexta-feira**. Além disso, obedecem horários baseados na categoria (Ex: Lembretes de Medicação das 08h às 09h, Nutrição das 11h às 13h, Educação Física das 16h às 18h).
+- **Campanhas de Grupo:** São enviadas de **Segunda a Sábado**, entre as **08:00 e as 18:00**.
+- **Domingos:** O bot é programado para nunca disparar nenhuma mensagem (seja individual ou de grupo) aos domingos. O reagendamento automático de trilhas empurrará qualquer envio dominical para a segunda-feira seguinte.
+
 ## 🔒 Segurança de Conteúdo
 Travas lógicas impedem absurdos clínicos: um paciente diabético, porém hipertenso, não receberá "Dicas de doces diet" (devido ao cruzamento de IA que evita complicações sistêmicas). As trilhas são filtradas de acordo com as tags clínicas de cada usuário.
 
