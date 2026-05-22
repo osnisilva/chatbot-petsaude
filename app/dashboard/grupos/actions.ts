@@ -177,3 +177,67 @@ export async function removeMemberFromGroupAction(groupId: string, patientId: st
     return { success: false, error: err.message };
   }
 }
+
+// 5. Importar pacientes da UBS por comorbidade (Pode ser feito por ACS e Gerente)
+export async function importPatientsByComorbidityAction(groupId: string, comorbidityName: string) {
+  try {
+    if (!groupId || !comorbidityName) {
+      throw new Error("Parâmetros inválidos");
+    }
+
+    const supabase = await createClient();
+    const profile = await getAcsProfile(supabase);
+
+    // 1. Validar se o grupo pertence à UBS do ACS logado
+    const { data: group, error: groupError } = await supabase
+      .from('patient_groups')
+      .select('id')
+      .eq('id', groupId)
+      .eq('ubs_id', profile.ubs_id)
+      .single();
+
+    if (groupError || !group) {
+      throw new Error("Grupo não encontrado ou não pertence à sua unidade de saúde");
+    }
+
+    // 2. Buscar todos os pacientes da mesma UBS que possuam a comorbidade informada no array
+    const { data: patients, error: patientsError } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('ubs_id', profile.ubs_id)
+      .contains('comorbidities', [comorbidityName]);
+
+    if (patientsError) {
+      throw new Error(`Erro ao buscar pacientes com comorbidade: ${patientsError.message}`);
+    }
+
+    if (!patients || patients.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // 3. Montar a lista de inserts para patient_group_members
+    const inserts = patients.map(p => ({
+      group_id: groupId,
+      patient_id: p.id
+    }));
+
+    // 4. Inserir em lote usando upsert e ignorando duplicados
+    const { error: insertError } = await supabase
+      .from('patient_group_members')
+      .upsert(inserts, { onConflict: 'group_id,patient_id', ignoreDuplicates: true });
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    // Revalidar caminhos
+    revalidatePath('/dashboard/grupos');
+    revalidatePath('/dashboard/pacientes');
+
+    return { success: true, count: patients.length };
+  } catch (err: any) {
+    console.error('Erro ao importar pacientes por comorbidade:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+

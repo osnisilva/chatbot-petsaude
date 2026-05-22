@@ -73,6 +73,8 @@ async function processScheduledMessages(whatsappClient) {
             template_id,
             is_random,
             category,
+            custom_title,
+            custom_content,
             patients ( id, phone_number, name, comorbidities, lgpd_consent ),
             health_templates ( title, category, content )
         `)
@@ -138,10 +140,13 @@ async function processScheduledMessages(whatsappClient) {
                 if (!members || members.length === 0) {
                     console.log(`[CRON INFO] Grupo ${schedule.group_id} está vazio. Nenhuma mensagem a enviar.`);
                     // Atualizar data de próxima execução para não travar
-                    const nextRun = calculateNextRunAt(schedule.frequency);
+                    const isUnica = schedule.frequency === 'unica';
+                    const updateData = isUnica 
+                        ? { status: 'completed' } 
+                        : { next_run_at: calculateNextRunAt(schedule.frequency) };
                     await supabase
                         .from('scheduled_messages')
-                        .update({ next_run_at: nextRun })
+                        .update(updateData)
                         .eq('id', schedule.id);
                     continue;
                 }
@@ -158,10 +163,13 @@ async function processScheduledMessages(whatsappClient) {
                     if (tError || !templates || templates.length === 0) {
                         console.error(`[CRON ERRO] Nenhum template encontrado para categoria ${schedule.category}`);
                         // Atualizar data para evitar travamento
-                        const nextRun = calculateNextRunAt(schedule.frequency);
+                        const isUnica = schedule.frequency === 'unica';
+                        const updateData = isUnica 
+                            ? { status: 'completed' } 
+                            : { next_run_at: calculateNextRunAt(schedule.frequency) };
                         await supabase
                             .from('scheduled_messages')
-                            .update({ next_run_at: nextRun })
+                            .update(updateData)
                             .eq('id', schedule.id);
                         continue;
                     }
@@ -189,9 +197,12 @@ async function processScheduledMessages(whatsappClient) {
                         }
                         content = safeTemplate.content;
                         title = safeTemplate.title;
+                    } else if (schedule.custom_content) {
+                        content = schedule.custom_content;
+                        title = schedule.custom_title || 'Campanha de Saúde';
                     } else {
                         if (!schedule.health_templates) {
-                            console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template vinculado.`);
+                            console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template/conteúdo avulso.`);
                             continue;
                         }
                         content = schedule.health_templates.content;
@@ -205,11 +216,14 @@ async function processScheduledMessages(whatsappClient) {
                     await new Promise(r => setTimeout(r, pause));
                 }
                 
-                // Calcular próxima data e atualizar o agendamento do grupo
-                const nextRun = calculateNextRunAt(schedule.frequency);
+                // Calcular próxima data e atualizar o agendamento do grupo ou marcar como concluído se for única
+                const isUnica = schedule.frequency === 'unica';
+                const updateData = isUnica 
+                    ? { status: 'completed' } 
+                    : { next_run_at: calculateNextRunAt(schedule.frequency) };
                 await supabase
                     .from('scheduled_messages')
-                    .update({ next_run_at: nextRun })
+                    .update(updateData)
                     .eq('id', schedule.id);
                 
                 console.log(`[CRON SUCESSO] Agendamento de grupo ${schedule.id} processado com sucesso.`);
@@ -249,9 +263,12 @@ async function processScheduledMessages(whatsappClient) {
                     }
                     content = safeTemplate.content;
                     title = safeTemplate.title;
+                } else if (schedule.custom_content) {
+                    content = schedule.custom_content;
+                    title = schedule.custom_title || 'Campanha de Saúde';
                 } else {
                     if (!schedule.health_templates) {
-                        console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template vinculado.`);
+                        console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template/conteúdo avulso.`);
                         continue;
                     }
                     content = schedule.health_templates.content;
@@ -264,10 +281,13 @@ async function processScheduledMessages(whatsappClient) {
                 const pause = Math.floor(Math.random() * (10000 - 5000 + 1) + 5000);
                 await new Promise(r => setTimeout(r, pause));
                 
-                const nextRun = calculateNextRunAt(schedule.frequency);
+                const isUnica = schedule.frequency === 'unica';
+                const updateData = isUnica 
+                    ? { status: 'completed' } 
+                    : { next_run_at: calculateNextRunAt(schedule.frequency) };
                 await supabase
                     .from('scheduled_messages')
-                    .update({ next_run_at: nextRun })
+                    .update(updateData)
                     .eq('id', schedule.id);
                 
                 console.log(`[CRON SUCESSO] Agendamento individual ${schedule.id} processado com sucesso.`);

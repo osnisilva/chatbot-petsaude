@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Users, Plus, Trash2, UserMinus, Search, AlertCircle, Calendar } from 'lucide-react';
-import { createGroupAction, deleteGroupAction, removeMemberFromGroupAction } from './actions';
+import { Users, Plus, Trash2, UserMinus, Search, AlertCircle, Calendar, UserPlus, Download } from 'lucide-react';
+import { createGroupAction, deleteGroupAction, removeMemberFromGroupAction, addMembersToGroupAction, importPatientsByComorbidityAction } from './actions';
 
 export default function GruposPage() {
   const supabase = createClient();
@@ -25,6 +25,13 @@ export default function GruposPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
+
+  // Novos estados para importação por comorbidade e adição manual
+  const [availablePatients, setAvailablePatients] = useState<any[]>([]);
+  const [selectedComorbidade, setSelectedComorbidade] = useState('Hipertensão');
+  const [selectedManualPatientId, setSelectedManualPatientId] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [isAddingManual, setIsAddingManual] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -114,10 +121,86 @@ export default function GruposPage() {
     setLoadingMembers(false);
   }
 
+  // Buscar pacientes da UBS que NÃO estão no grupo
+  async function fetchAvailablePatients(groupId: string, currentUbsId: string) {
+    const { data: allPatients, error: pError } = await supabase
+      .from('patients')
+      .select('id, name')
+      .eq('ubs_id', currentUbsId)
+      .order('name');
+
+    if (pError) {
+      console.error("Erro ao buscar pacientes para adição:", pError.message);
+      return;
+    }
+
+    const { data: membersData, error: mError } = await supabase
+      .from('patient_group_members')
+      .select('patient_id')
+      .eq('group_id', groupId);
+
+    if (mError) {
+      console.error("Erro ao buscar membros existentes:", mError.message);
+      return;
+    }
+
+    const memberIds = new Set(membersData.map((m: any) => m.patient_id));
+    const filtered = (allPatients || []).filter((p: any) => !memberIds.has(p.id));
+    setAvailablePatients(filtered);
+  }
+
   // Selecionar um grupo para ver os detalhes
   const handleSelectGroup = async (grupo: any) => {
     setSelectedGroup(grupo);
     await fetchMembers(grupo.id);
+    if (ubsId) {
+      await fetchAvailablePatients(grupo.id, ubsId);
+    }
+  };
+
+  // Executa importação rápida por comorbidade (e-SUS)
+  const handleImportByComorbidity = async () => {
+    if (!selectedGroup || !selectedComorbidade) return;
+    setIsImporting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const result = await importPatientsByComorbidityAction(selectedGroup.id, selectedComorbidade);
+    setIsImporting(false);
+
+    if (result.success) {
+      setSuccessMsg(`Importação concluída! ${result.count} paciente(s) com "${selectedComorbidade}" adicionado(s) ao grupo.`);
+      await fetchMembers(selectedGroup.id);
+      if (ubsId) {
+        await fetchGroups(ubsId);
+        await fetchAvailablePatients(selectedGroup.id, ubsId);
+      }
+    } else {
+      setErrorMsg(result.error || 'Erro ao importar pacientes');
+    }
+  };
+
+  // Adiciona paciente individualmente
+  const handleAddManualPatient = async () => {
+    if (!selectedGroup || !selectedManualPatientId) return;
+    setIsAddingManual(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const result = await addMembersToGroupAction(selectedGroup.id, [selectedManualPatientId]);
+    setIsAddingManual(false);
+
+    if (result.success) {
+      setSuccessMsg(`Paciente adicionado com sucesso ao grupo.`);
+      setSelectedManualPatientId('');
+      await fetchMembers(selectedGroup.id);
+      if (ubsId) {
+        await fetchGroups(ubsId);
+        await fetchAvailablePatients(selectedGroup.id, ubsId);
+      }
+    } else {
+      setErrorMsg(result.error || 'Erro ao adicionar paciente');
+    }
   };
 
   // Submeter formulário de criação
@@ -182,8 +265,11 @@ export default function GruposPage() {
       setSuccessMsg(`Membro removido com sucesso.`);
       // Recarregar membros
       await fetchMembers(selectedGroup.id);
-      // Recarregar contagem de membros na lista de grupos
-      if (ubsId) await fetchGroups(ubsId);
+      // Recarregar contagem de membros na lista de grupos e atualizar dropdown manual
+      if (ubsId) {
+        await fetchGroups(ubsId);
+        await fetchAvailablePatients(selectedGroup.id, ubsId);
+      }
     } else {
       setErrorMsg(result.error || 'Erro ao remover membro');
     }
@@ -255,6 +341,86 @@ export default function GruposPage() {
                     value={memberSearchTerm}
                     onChange={(e) => setMemberSearchTerm(e.target.value)}
                   />
+                </div>
+              </div>
+
+              {/* Bloco: Gerenciamento Rápido de Membros (Importar e Adicionar) */}
+              <div className="bg-slate-50 border border-slate-200/60 rounded-3xl p-5 mb-6">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                  <UserPlus className="h-4 w-4 text-teal-600" />
+                  Gerenciar Pacientes do Grupo
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Importação e-SUS */}
+                  <div className="space-y-3">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Importação Rápida por Comorbidade (e-SUS)
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        aria-label="Selecionar comorbidade do e-SUS para importar"
+                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-xs font-medium text-slate-700"
+                        value={selectedComorbidade}
+                        onChange={(e) => setSelectedComorbidade(e.target.value)}
+                      >
+                        <option value="Hipertensão">Hipertensão (e-SUS)</option>
+                        <option value="Diabetes">Diabetes (e-SUS)</option>
+                        <option value="Gestante">Gestante (e-SUS)</option>
+                        <option value="Asma">Asma (e-SUS)</option>
+                        <option value="Obesidade">Obesidade (e-SUS)</option>
+                        <option value="Tabagismo">Tabagismo</option>
+                      </select>
+                      <button
+                        onClick={handleImportByComorbidity}
+                        disabled={isImporting}
+                        className="bg-teal-50 hover:bg-teal-100 disabled:bg-slate-100 text-teal-700 hover:text-teal-800 disabled:text-slate-400 px-4 py-2 border border-teal-100 disabled:border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        {isImporting ? 'Importando...' : 'Importar'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Puxa do sistema todos da sua unidade que possuem a comorbidade selecionada.
+                    </p>
+                  </div>
+
+                  {/* Adição Manual */}
+                  <div className="space-y-3">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Adicionar Paciente Individual (Manual)
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        aria-label="Selecionar paciente para adicionar manualmente ao grupo"
+                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-xs font-medium text-slate-700"
+                        value={selectedManualPatientId}
+                        onChange={(e) => setSelectedManualPatientId(e.target.value)}
+                        disabled={availablePatients.length === 0}
+                      >
+                        {availablePatients.length === 0 ? (
+                          <option value="">Nenhum paciente disponível...</option>
+                        ) : (
+                          <>
+                            <option value="">Selecione um paciente...</option>
+                            {availablePatients.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                      <button
+                        onClick={handleAddManualPatient}
+                        disabled={isAddingManual || !selectedManualPatientId}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Adicionar
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Permite vincular manualmente pacientes com outras condições (ex: Tabagismo, etc).
+                    </p>
+                  </div>
                 </div>
               </div>
 

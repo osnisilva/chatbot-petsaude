@@ -14,23 +14,50 @@ export async function createScheduleAction(formData: FormData) {
 
     const patient_id = formData.get('patient_id') || null;
     const group_id = formData.get('group_id') || null;
+    const message_type = formData.get('message_type') || 'template'; // 'template' | 'random' | 'custom'
     const template_id = formData.get('template_id') || null;
-    const is_random = formData.get('is_random') === 'true';
-    const category = formData.get('category');
+    const category = formData.get('category') || null;
     const frequency = formData.get('frequency');
-    const next_run_at = new Date().toISOString();
+    
+    // Captura da mensagem personalizada avulsa
+    const custom_title = formData.get('custom_title') as string || null;
+    const custom_content = formData.get('custom_content') as string || null;
+    
+    // Captura da data programada
+    const next_run_at_input = formData.get('next_run_at') as string;
+    const next_run_at = next_run_at_input ? new Date(next_run_at_input).toISOString() : new Date().toISOString();
 
-    const { error } = await supabase.from('scheduled_messages').insert({
+    const is_random = message_type === 'random';
+
+    const insertData: any = {
       acs_id: acsProfile.data.id,
       patient_id: patient_id || null,
       group_id: group_id || null,
-      template_id: is_random ? null : template_id,
-      is_random,
-      category: is_random ? category : null,
       frequency,
       next_run_at,
-      status: 'active'
-    });
+      status: 'active',
+      is_random
+    };
+
+    if (message_type === 'custom') {
+      insertData.template_id = null;
+      insertData.category = null;
+      insertData.custom_title = custom_title ? custom_title.trim() : 'Campanha de Saúde';
+      insertData.custom_content = custom_content ? custom_content.trim() : '';
+    } else if (message_type === 'random') {
+      insertData.template_id = null;
+      insertData.category = category;
+      insertData.custom_title = null;
+      insertData.custom_content = null;
+    } else {
+      // template
+      insertData.template_id = template_id;
+      insertData.category = null;
+      insertData.custom_title = null;
+      insertData.custom_content = null;
+    }
+
+    const { error } = await supabase.from('scheduled_messages').insert(insertData);
 
     if (error) throw error;
     revalidatePath('/dashboard/agendamentos');
