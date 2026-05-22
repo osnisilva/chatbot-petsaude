@@ -200,23 +200,42 @@ export async function importPatientsByComorbidityAction(groupId: string, comorbi
       throw new Error("Grupo não encontrado ou não pertence à sua unidade de saúde");
     }
 
-    // 2. Buscar todos os pacientes da mesma UBS que possuam a comorbidade informada no array
+    // 2. Buscar todos os pacientes da mesma UBS para filtragem flexível
     const { data: patients, error: patientsError } = await supabase
       .from('patients')
-      .select('id')
-      .eq('ubs_id', profile.ubs_id)
-      .contains('comorbidities', [comorbidityName]);
+      .select('id, name, comorbidities')
+      .eq('ubs_id', profile.ubs_id);
 
     if (patientsError) {
-      throw new Error(`Erro ao buscar pacientes com comorbidade: ${patientsError.message}`);
+      throw new Error(`Erro ao buscar pacientes: ${patientsError.message}`);
     }
 
     if (!patients || patients.length === 0) {
       return { success: true, count: 0 };
     }
 
+    // Helper de normalização para ignorar acentos e maiúsculas
+    const normalize = (str: string) => 
+      str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    const normalizedSearch = normalize(comorbidityName);
+
+    // Filtrar pacientes com correspondência parcial ou exata da comorbidade
+    const matchedPatients = patients.filter((p: any) => {
+      if (!p.comorbidities || !Array.isArray(p.comorbidities)) return false;
+      return p.comorbidities.some((c: string) => {
+        if (!c) return false;
+        const normalizedItem = normalize(c);
+        return normalizedItem.includes(normalizedSearch);
+      });
+    });
+
+    if (matchedPatients.length === 0) {
+      return { success: true, count: 0 };
+    }
+
     // 3. Montar a lista de inserts para patient_group_members
-    const inserts = patients.map(p => ({
+    const inserts = matchedPatients.map((p: any) => ({
       group_id: groupId,
       patient_id: p.id
     }));
