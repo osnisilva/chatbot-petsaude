@@ -7,6 +7,7 @@ import { createGroupAction, deleteGroupAction, removeMemberFromGroupAction } fro
 
 export default function GruposPage() {
   const supabase = createClient();
+  const [mounted, setMounted] = useState(false);
   const [userRole, setUserRole] = useState('acs');
   const [ubsId, setUbsId] = useState<string | null>(null);
   const [grupos, setGrupos] = useState<any[]>([]);
@@ -26,6 +27,7 @@ export default function GruposPage() {
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
 
   useEffect(() => {
+    setMounted(true);
     async function fetchInitialData() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -86,6 +88,7 @@ export default function GruposPage() {
   // Buscar membros de um grupo selecionado
   async function fetchMembers(groupId: string) {
     setLoadingMembers(true);
+    setErrorMsg(null);
     const { data, error } = await supabase
       .from('patient_group_members')
       .select(`
@@ -101,6 +104,7 @@ export default function GruposPage() {
 
     if (error) {
       console.error("Erro ao buscar membros:", error.message);
+      setErrorMsg(`Erro ao carregar membros do grupo: ${error.message}`);
     } else if (data) {
       const formattedMembers = data
         .map((m: any) => m.patient)
@@ -225,115 +229,7 @@ export default function GruposPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Painel Esquerdo: Criação e Lista de Grupos */}
-        <div className="lg:col-span-1 space-y-8">
-          
-          {/* Formulário de Criação (Apenas para Gerentes/Admin) */}
-          {isManagerOrAdmin ? (
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-              <h2 className="font-black text-slate-800 text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Plus className="h-5 w-5 text-teal-600" />
-                Criar Novo Grupo
-              </h2>
-              <form onSubmit={handleCreateGroup} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Nome do Grupo</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ex: Campanha Vacina Gripe 2026"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-700 font-medium"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Descrição (Objetivo)</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Ex: Grupo voltado para acompanhamento de vacinação anual e envio de lembretes..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-700 font-medium"
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? 'Salvando...' : 'Criar Grupo'}
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="bg-slate-100/50 rounded-3xl p-6 border border-slate-200/50 text-center">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Aviso de Permissão</p>
-              <p className="text-sm text-slate-600 mt-2">A criação de novos grupos de saúde é restrita aos gerentes e administradores.</p>
-            </div>
-          )}
-
-          {/* Listagem dos Grupos */}
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-            <h2 className="font-black text-slate-800 text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Users className="h-5 w-5 text-teal-600" />
-              Grupos da Unidade
-            </h2>
-            
-            {loading ? (
-              <p className="text-slate-400 text-sm text-center py-6">Carregando grupos...</p>
-            ) : grupos.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-6">Nenhum grupo cadastrado nesta unidade.</p>
-            ) : (
-              <div className="space-y-3">
-                {grupos.map((g) => (
-                  <div
-                    key={g.id}
-                    onClick={() => handleSelectGroup(g)}
-                    className={`p-4 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col relative group ${
-                      selectedGroup?.id === g.id
-                        ? 'border-teal-500 bg-teal-50/20 shadow-md'
-                        : 'border-slate-100 bg-white hover:border-slate-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start pr-8">
-                      <h3 className="font-bold text-slate-800 group-hover:text-teal-700 transition-colors truncate max-w-[180px]">{g.name}</h3>
-                      <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-md uppercase flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {g.memberCount}
-                      </span>
-                    </div>
-                    {g.description && (
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{g.description}</p>
-                    )}
-                    <span className="text-[10px] text-slate-400 font-mono mt-3 flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      Criado em {new Date(g.created_at).toLocaleDateString('pt-BR')}
-                    </span>
-
-                    {/* Botão de Excluir Grupo */}
-                    {isManagerOrAdmin && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteGroup(g.id, g.name);
-                        }}
-                        className="absolute right-3 bottom-3 p-1.5 text-slate-300 hover:text-rose-600 transition-colors"
-                        title="Excluir Grupo"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Painel Direito: Membros do Grupo Selecionado */}
+        {/* Painel Esquerdo (Largo, 2/3): Membros do Grupo Selecionado ("os grupos") */}
         <div className="lg:col-span-2">
           {selectedGroup ? (
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 h-full flex flex-col min-h-[500px]">
@@ -415,10 +311,145 @@ export default function GruposPage() {
               </div>
               <h2 className="text-xl font-bold text-slate-800">Selecione um Grupo</h2>
               <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-                Selecione um grupo da lista ao lado para ver os pacientes vinculados, retirar membros ou gerenciar as campanhas.
+                Selecione um grupo de saúde da lista à direita para visualizar os pacientes vinculados, remover membros ou gerenciar as campanhas.
               </p>
             </div>
           )}
+        </div>
+
+        {/* Painel Direito (Estreito, 1/3): Criação e Seleção de Grupos da Unidade */}
+        <div className="lg:col-span-1 space-y-8">
+          
+          {/* Formulário de Criação (Apenas para Gerentes/Admin) */}
+          {isManagerOrAdmin ? (
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+              <h2 className="font-black text-slate-800 text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Plus className="h-5 w-5 text-teal-600" />
+                Criar Novo Grupo
+              </h2>
+              <form onSubmit={handleCreateGroup} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Nome do Grupo</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Campanha Vacina Gripe 2026"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-700 font-medium"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Descrição (Objetivo)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Ex: Grupo voltado para acompanhamento de vacinação anual e envio de lembretes..."
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-700 font-medium"
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? 'Salvando...' : 'Criar Grupo'}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="bg-slate-100/50 rounded-3xl p-6 border border-slate-200/50 text-center">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Aviso de Permissão</p>
+              <p className="text-sm text-slate-600 mt-2">A criação de novos grupos de saúde é restrita aos gerentes e administradores.</p>
+            </div>
+          )}
+
+          {/* Listagem dos Grupos da Unidade */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+            <h2 className="font-black text-slate-800 text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Users className="h-5 w-5 text-teal-600" />
+              Grupos da Unidade
+            </h2>
+            
+            {loading ? (
+              <p className="text-slate-400 text-sm text-center py-6">Carregando grupos...</p>
+            ) : grupos.length === 0 ? (
+              <p className="text-slate-400 text-sm text-center py-6">Nenhum grupo cadastrado nesta unidade.</p>
+            ) : (
+              <div className="space-y-4">
+                {grupos.map((g) => (
+                  <div
+                    key={g.id}
+                    onClick={() => handleSelectGroup(g)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleSelectGroup(g);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Grupo ${g.name}, ${g.memberCount} membros. Clique para ver membros.`}
+                    className={`p-4 rounded-2xl border transition-all duration-300 cursor-pointer flex flex-col relative group focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${
+                      selectedGroup?.id === g.id
+                        ? 'border-teal-500 bg-teal-50/20 shadow-md ring-2 ring-teal-500/20'
+                        : 'border-slate-100 bg-white hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start pr-8">
+                      <h3 className="font-bold text-slate-800 group-hover:text-teal-700 transition-colors truncate max-w-[180px]">{g.name}</h3>
+                      <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-md uppercase flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {g.memberCount}
+                      </span>
+                    </div>
+                    {g.description && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{g.description}</p>
+                    )}
+                    
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                        Criado em {mounted ? new Date(g.created_at).toLocaleDateString('pt-BR') : ''}
+                      </span>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectGroup(g);
+                        }}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm ${
+                          selectedGroup?.id === g.id
+                            ? 'bg-teal-600 text-white hover:bg-teal-700'
+                            : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                        }`}
+                      >
+                        {selectedGroup?.id === g.id ? 'Selecionado' : 'Ver Membros'}
+                      </button>
+                    </div>
+
+                    {/* Botão de Excluir Grupo */}
+                    {isManagerOrAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteGroup(g.id, g.name);
+                        }}
+                        className="absolute right-3 top-3.5 p-1.5 text-slate-300 hover:text-rose-600 transition-colors"
+                        title="Excluir Grupo"
+                        aria-label={`Excluir grupo ${g.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
