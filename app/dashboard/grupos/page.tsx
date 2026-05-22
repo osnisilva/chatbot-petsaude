@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Users, Plus, Trash2, UserMinus, Search, AlertCircle, Calendar, UserPlus, Download } from 'lucide-react';
-import { createGroupAction, deleteGroupAction, removeMemberFromGroupAction, addMembersToGroupAction, importPatientsByComorbidityAction } from './actions';
+import { createGroupAction, editGroupAction, deleteGroupAction, removeMemberFromGroupAction, addMembersToGroupAction, importPatientsByComorbidityAction } from './actions';
 
 export default function GruposPage() {
   const supabase = createClient();
@@ -18,7 +18,11 @@ export default function GruposPage() {
   // Estados do formulário de criação
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newCampaignTitle, setNewCampaignTitle] = useState('');
+  const [newCampaignContent, setNewCampaignContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editGroupId, setEditGroupId] = useState('');
 
   // Estados do grupo selecionado
   const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
@@ -72,6 +76,8 @@ export default function GruposPage() {
         id, 
         name, 
         description, 
+        campaign_title,
+        campaign_content,
         created_at,
         patient_group_members(count)
       `)
@@ -85,6 +91,8 @@ export default function GruposPage() {
         id: g.id,
         name: g.name,
         description: g.description,
+        campaign_title: g.campaign_title,
+        campaign_content: g.campaign_content,
         created_at: g.created_at,
         memberCount: g.patient_group_members?.[0]?.count || 0
       }));
@@ -152,10 +160,30 @@ export default function GruposPage() {
   // Selecionar um grupo para ver os detalhes
   const handleSelectGroup = async (grupo: any) => {
     setSelectedGroup(grupo);
+    setIsEditing(false);
     await fetchMembers(grupo.id);
     if (ubsId) {
       await fetchAvailablePatients(grupo.id, ubsId);
     }
+  };
+
+  const handleStartEdit = () => {
+    if (!selectedGroup) return;
+    setIsEditing(true);
+    setEditGroupId(selectedGroup.id);
+    setNewName(selectedGroup.name || '');
+    setNewDescription(selectedGroup.description || '');
+    setNewCampaignTitle(selectedGroup.campaign_title || '');
+    setNewCampaignContent(selectedGroup.campaign_content || '');
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditGroupId('');
+    setNewName('');
+    setNewDescription('');
+    setNewCampaignTitle('');
+    setNewCampaignContent('');
   };
 
   // Executa importação rápida por comorbidade (e-SUS)
@@ -213,18 +241,37 @@ export default function GruposPage() {
     setSuccessMsg(null);
 
     const formData = new FormData();
+    if (isEditing) formData.append('id', editGroupId);
     formData.append('name', newName);
     formData.append('description', newDescription);
+    formData.append('campaign_title', newCampaignTitle);
+    formData.append('campaign_content', newCampaignContent);
 
-    const result = await createGroupAction(formData);
+    const result = isEditing 
+      ? await editGroupAction(formData) 
+      : await createGroupAction(formData);
 
     if (result.success) {
       setNewName('');
       setNewDescription('');
-      setSuccessMsg('Grupo de saúde criado com sucesso!');
+      setNewCampaignTitle('');
+      setNewCampaignContent('');
+      setSuccessMsg(isEditing ? 'Grupo atualizado com sucesso!' : 'Grupo de saúde criado com sucesso!');
+      setIsEditing(false);
+      setEditGroupId('');
       await fetchGroups(ubsId);
+      if (isEditing && selectedGroup) {
+        // Atualizar o selectedGroup localmente para refletir as mudanças sem precisar refazer fetch do select
+        setSelectedGroup({
+          ...selectedGroup,
+          name: newName,
+          description: newDescription,
+          campaign_title: newCampaignTitle,
+          campaign_content: newCampaignContent
+        });
+      }
     } else {
-      setErrorMsg(result.error || 'Erro ao criar grupo');
+      setErrorMsg(result.error || (isEditing ? 'Erro ao atualizar grupo' : 'Erro ao criar grupo'));
     }
     setIsSubmitting(false);
   };
@@ -320,12 +367,20 @@ export default function GruposPage() {
           {selectedGroup ? (
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 h-full flex flex-col min-h-[500px]">
               
-              {/* Header do Painel */}
+                {/* Header do Painel */}
               <div className="border-b border-slate-100 pb-5 mb-5 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                 <div>
                   <h2 className="text-2xl font-black text-slate-800">{selectedGroup.name}</h2>
                   {selectedGroup.description && (
                     <p className="text-slate-500 mt-1.5 text-sm">{selectedGroup.description}</p>
+                  )}
+                  {isManagerOrAdmin && (
+                    <button
+                      onClick={handleStartEdit}
+                      className="mt-3 text-xs font-bold text-teal-600 hover:text-teal-700 underline"
+                    >
+                      Editar Informações do Grupo
+                    </button>
                   )}
                 </div>
                 
@@ -424,6 +479,19 @@ export default function GruposPage() {
                 </div>
               </div>
 
+              {/* Detalhes da Campanha */}
+              {(selectedGroup.campaign_title || selectedGroup.campaign_content) && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-6">
+                  <h3 className="text-[10px] font-bold text-indigo-800 uppercase tracking-widest mb-2">Mensagem Padrão da Campanha</h3>
+                  {selectedGroup.campaign_title && (
+                    <p className="text-sm font-bold text-slate-800 mb-1">{selectedGroup.campaign_title}</p>
+                  )}
+                  {selectedGroup.campaign_content && (
+                    <p className="text-xs text-slate-600 italic">"{selectedGroup.campaign_content}"</p>
+                  )}
+                </div>
+              )}
+
               {/* Lista de Membros */}
               <div className="flex-1 overflow-y-auto">
                 {loadingMembers ? (
@@ -488,10 +556,10 @@ export default function GruposPage() {
           
           {/* Formulário de Criação (Apenas para Gerentes/Admin) */}
           {isManagerOrAdmin ? (
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 sticky top-8">
               <h2 className="font-black text-slate-800 text-lg uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Plus className="h-5 w-5 text-teal-600" />
-                Criar Novo Grupo
+                {isEditing ? 'Editar Grupo' : 'Criar Novo Grupo'}
               </h2>
               <form onSubmit={handleCreateGroup} className="space-y-4">
                 <div>
@@ -509,7 +577,7 @@ export default function GruposPage() {
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Descrição (Objetivo)</label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     placeholder="Ex: Grupo voltado para acompanhamento de vacinação anual e envio de lembretes..."
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-700 font-medium"
                     value={newDescription}
@@ -517,13 +585,52 @@ export default function GruposPage() {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? 'Salvando...' : 'Criar Grupo'}
-                </button>
+                <div className="pt-2 border-t border-slate-100">
+                  <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-3">Texto Padrão da Campanha</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Assunto</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Vacinação contra a Gripe"
+                        className="w-full px-3 py-2 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-medium text-slate-700"
+                        value={newCampaignTitle}
+                        onChange={(e) => setNewCampaignTitle(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mensagem do WhatsApp</label>
+                      <textarea
+                        required
+                        rows={3}
+                        placeholder="Escreva a mensagem que será disparada..."
+                        className="w-full px-3 py-2 bg-indigo-50/50 border border-indigo-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-medium text-slate-700"
+                        value={newCampaignContent}
+                        onChange={(e) => setNewCampaignContent(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  {isEditing && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all duration-300 text-xs"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className={`${isEditing ? 'w-2/3' : 'w-full'} bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2`}
+                  >
+                    {isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar Edição' : 'Criar Grupo')}
+                  </button>
+                </div>
               </form>
             </div>
           ) : (

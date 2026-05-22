@@ -9,7 +9,7 @@ export async function createScheduleAction(formData: FormData) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    const acsProfile = await supabase.from('acs').select('id').eq('auth_user_id', user.id).single();
+    const acsProfile = await supabase.from('acs').select('id, role').eq('auth_user_id', user.id).single();
     if (!acsProfile.data) throw new Error("Perfil ACS não encontrado");
 
     const patient_id = formData.get('patient_id') || null;
@@ -25,7 +25,17 @@ export async function createScheduleAction(formData: FormData) {
     
     // Captura da data programada
     const next_run_at_input = formData.get('next_run_at') as string;
+    const is_random = message_type === 'random';
+
+    // 1. Validar horários e restrições se for grupo
+    // 2. Buscar o title e content padrão do grupo se for grupo (sobrescrevendo o que vier da UI)
+    let final_custom_title = custom_title;
+    let final_custom_content = custom_content;
+
     if (group_id) {
+      if (acsProfile.data.role !== 'gerente' && acsProfile.data.role !== 'admin_ti') {
+        throw new Error("Apenas gerentes podem cadastrar campanhas de grupo para a unidade.");
+      }
       if (!next_run_at_input) {
         throw new Error("A data e o horário do envio são obrigatórios para campanhas de grupo.");
       }
@@ -37,10 +47,23 @@ export async function createScheduleAction(formData: FormData) {
       if (hour < 8 || hour >= 18) {
         throw new Error("O horário de agendamento deve estar entre 08:00 e 17:59.");
       }
-    }
-    const next_run_at = next_run_at_input ? new Date(next_run_at_input).toISOString() : new Date().toISOString();
 
-    const is_random = message_type === 'random';
+      // Busca os dados do grupo no banco de dados para garantir que a campanha tenha a mesma mensagem para todos
+      const { data: groupData, error: groupError } = await supabase
+        .from('patient_groups')
+        .select('campaign_title, campaign_content')
+        .eq('id', group_id)
+        .single();
+
+      if (groupError || !groupData) {
+        throw new Error("Erro ao buscar os dados do grupo de saúde.");
+      }
+      
+      final_custom_title = groupData.campaign_title || 'Campanha de Saúde';
+      final_custom_content = groupData.campaign_content || '';
+    }
+
+    const next_run_at = next_run_at_input ? new Date(next_run_at_input).toISOString() : new Date().toISOString();
 
     const insertData: any = {
       acs_id: acsProfile.data.id,
@@ -55,8 +78,8 @@ export async function createScheduleAction(formData: FormData) {
     if (message_type === 'custom') {
       insertData.template_id = null;
       insertData.category = null;
-      insertData.custom_title = custom_title ? custom_title.trim() : 'Campanha de Saúde';
-      insertData.custom_content = custom_content ? custom_content.trim() : '';
+      insertData.custom_title = final_custom_title ? final_custom_title.trim() : 'Campanha de Saúde';
+      insertData.custom_content = final_custom_content ? final_custom_content.trim() : '';
     } else if (message_type === 'random') {
       insertData.template_id = null;
       insertData.category = category;
@@ -86,6 +109,14 @@ export async function deleteScheduleAction(scheduleId: string) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
+
+    const acsProfile = await supabase.from('acs').select('id, role').eq('auth_user_id', user.id).single();
+    if (!acsProfile.data) throw new Error("Perfil ACS não encontrado");
+
+    const schedule = await supabase.from('scheduled_messages').select('group_id').eq('id', scheduleId).single();
+    if (schedule.data?.group_id && acsProfile.data.role !== 'gerente' && acsProfile.data.role !== 'admin_ti') {
+      throw new Error("Apenas gerentes podem cancelar campanhas de grupo.");
+    }
 
     await supabase.from('scheduled_messages').delete().eq('id', scheduleId);
     revalidatePath('/dashboard/agendamentos');

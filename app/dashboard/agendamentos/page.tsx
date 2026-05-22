@@ -21,11 +21,12 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
   // 1. Obter Perfil do ACS Logado
   const { data: acs } = await supabase
     .from('acs')
-    .select('id, ubs_id, ubs:ubs_id(name)')
+    .select('id, ubs_id, role, ubs:ubs_id(name)')
     .eq('auth_user_id', session.id)
     .single();
 
   const isSecretaria = (acs?.ubs as any)?.name === 'Secretaria de Saúde';
+  const isManager = acs?.role === 'gerente' || acs?.role === 'admin_ti';
 
   // 2. Buscar Todos os Pacientes e Grupos
   let patientsQuery = supabase.from('patients').select('id, name, phone_number, comorbidities');
@@ -131,6 +132,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
                 availableGroups={availableGroups}
                 templates={templates || []} 
                 tab={tab}
+                isManager={isManager}
               />
           </div>
         </div>
@@ -140,7 +142,7 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
           
           {tab === 'grupo' ? (
             /* Campanhas de Grupo */
-            <GroupCampaignsList schedules={groupSchedules} />
+            <GroupCampaignsList schedules={groupSchedules} isManager={isManager} />
           ) : (
             /* Pacientes Individuais */
             <div>

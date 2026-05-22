@@ -4,9 +4,10 @@ import { deleteScheduleAction } from './actions';
 
 interface GroupCampaignsListProps {
   schedules: any[];
+  isManager?: boolean;
 }
 
-export default function GroupCampaignsList({ schedules }: GroupCampaignsListProps) {
+export default function GroupCampaignsList({ schedules, isManager }: GroupCampaignsListProps) {
   
   const handleCancelGroupSchedule = async (scheduleId: string, groupName: string) => {
     if (confirm(`Deseja cancelar esta campanha do grupo "${groupName}"?`)) {
@@ -43,16 +44,24 @@ export default function GroupCampaignsList({ schedules }: GroupCampaignsListProp
               >
                 <div>
                   <div className="flex justify-between items-start gap-2 mb-3">
-                    <span className="bg-teal-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase">
-                      Campanha em Grupo
-                    </span>
-                    <button
-                      onClick={() => handleCancelGroupSchedule(camp.id, groupName)}
-                      className="text-slate-300 hover:text-rose-500 transition-colors p-1 hover:bg-rose-50 rounded-lg"
-                      title="Cancelar campanha"
-                    >
-                      🗑️
-                    </button>
+                    {new Date(camp.next_run_at).getTime() < new Date().getTime() ? (
+                      <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase shadow-sm">
+                        Campanha Finalizada / Vencida
+                      </span>
+                    ) : (
+                      <span className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase shadow-sm">
+                        Campanha Agendada
+                      </span>
+                    )}
+                    {isManager && (
+                      <button
+                        onClick={() => handleCancelGroupSchedule(camp.id, groupName)}
+                        className="text-slate-300 hover:text-rose-500 transition-colors p-1 hover:bg-rose-50 rounded-lg"
+                        title="Cancelar campanha"
+                      >
+                        🗑️
+                      </button>
+                    )}
                   </div>
 
                   <h3 className="font-bold text-base text-slate-800 leading-tight mb-1">{groupName}</h3>
@@ -90,10 +99,17 @@ export default function GroupCampaignsList({ schedules }: GroupCampaignsListProp
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-slate-200/50 flex justify-between items-center">
-                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-bold uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Ativo no Bot
-                  </span>
+                  {new Date(camp.next_run_at).getTime() < new Date().getTime() ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-rose-600 font-bold uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                      Processada pelo Bot
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-bold uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Aguardando Bot
+                    </span>
+                  )}
                 </div>
               </div>
             );

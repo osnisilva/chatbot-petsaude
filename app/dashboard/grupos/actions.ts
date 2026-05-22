@@ -30,6 +30,8 @@ export async function createGroupAction(formData: FormData) {
 
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
+    const campaign_title = formData.get('campaign_title') as string;
+    const campaign_content = formData.get('campaign_content') as string;
 
     if (!name || name.trim() === '') {
       throw new Error("O nome do grupo é obrigatório");
@@ -40,6 +42,8 @@ export async function createGroupAction(formData: FormData) {
       .insert({
         name: name.trim(),
         description: description?.trim() || null,
+        campaign_title: campaign_title?.trim() || null,
+        campaign_content: campaign_content?.trim() || null,
         ubs_id: profile.ubs_id
       });
 
@@ -49,6 +53,47 @@ export async function createGroupAction(formData: FormData) {
     return { success: true };
   } catch (err: any) {
     console.error('Erro ao criar grupo:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// 1.5 Editar grupo de saúde
+export async function editGroupAction(formData: FormData) {
+  try {
+    const supabase = await createClient();
+    const profile = await getAcsProfile(supabase);
+
+    if (profile.role !== 'gerente' && profile.role !== 'admin_ti') {
+      throw new Error("Apenas gerentes ou administradores de TI podem editar grupos de saúde");
+    }
+
+    const id = formData.get('id') as string;
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+    const campaign_title = formData.get('campaign_title') as string;
+    const campaign_content = formData.get('campaign_content') as string;
+
+    if (!id || !name || name.trim() === '') {
+      throw new Error("O ID e o nome do grupo são obrigatórios");
+    }
+
+    const { error } = await supabase
+      .from('patient_groups')
+      .update({
+        name: name.trim(),
+        description: description?.trim() || null,
+        campaign_title: campaign_title?.trim() || null,
+        campaign_content: campaign_content?.trim() || null
+      })
+      .eq('id', id)
+      .eq('ubs_id', profile.ubs_id);
+
+    if (error) throw error;
+
+    revalidatePath('/dashboard/grupos');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Erro ao editar grupo:', err.message);
     return { success: false, error: err.message };
   }
 }

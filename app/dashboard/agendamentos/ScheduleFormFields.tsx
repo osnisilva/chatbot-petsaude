@@ -8,9 +8,10 @@ interface ScheduleFormFieldsProps {
   availableGroups: any[];
   templates: any[];
   tab: string; // 'individual' | 'grupo'
+  isManager?: boolean;
 }
 
-export default function ScheduleFormFields({ availablePatients, availableGroups, templates, tab }: ScheduleFormFieldsProps) {
+export default function ScheduleFormFields({ availablePatients, availableGroups, templates, tab, isManager }: ScheduleFormFieldsProps) {
   const [loading, setLoading] = useState(false);
   const [messageType, setMessageType] = useState<'template' | 'random' | 'custom'>('template');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -64,8 +65,14 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <input type="hidden" name="message_type" value={messageType} />
-      <input type="hidden" name="category" value={messageType === 'random' ? selectedCategory : templateCategory} />
+      {tab === 'grupo' && !isManager ? (
+        <div className="text-center py-6">
+          <p className="text-slate-500 font-medium text-sm">Apenas gerentes de unidade podem cadastrar campanhas de grupo.</p>
+        </div>
+      ) : (
+        <>
+          <input type="hidden" name="message_type" value={messageType} />
+          <input type="hidden" name="category" value={messageType === 'random' ? selectedCategory : templateCategory} />
 
       {/* Seleção do Destinatário (Paciente ou Grupo dependendo da Aba) */}
       {tab === 'individual' ? (
@@ -174,28 +181,16 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Inputs de Mensagem Customizada para Grupo */}
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Assunto da Campanha</label>
-              <input 
-                type="text" 
-                name="custom_title" 
-                required
-                placeholder="Ex: Campanha de Vacinação COVID/Gripe"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium" 
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Texto da Mensagem</label>
-              <textarea 
-                name="custom_content" 
-                required
-                rows={4}
-                placeholder="Digite a mensagem personalizada que será enviada para o WhatsApp..."
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium"
-              />
-            </div>
+          <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl mb-4">
+            <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Mensagem da Campanha Padrão
+            </h3>
+            <p className="text-[11px] text-indigo-600 font-medium">
+              O título e o texto da mensagem serão puxados automaticamente das configurações do Grupo de Saúde selecionado. Dessa forma, garantimos que todos os agentes disparem a mesma mensagem padronizada.
+            </p>
           </div>
 
           {/* Programar Data e Hora do Envio (Apenas para Grupo) */}
@@ -227,6 +222,8 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
       >
         {loading ? 'Aguarde...' : (tab === 'individual' ? 'Ativar Trilha de Cuidado' : 'Agendar / Disparar Campanha')}
       </button>
+      </>
+      )}
     </form>
   );
 }
