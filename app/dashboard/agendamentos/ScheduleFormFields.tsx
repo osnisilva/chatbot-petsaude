@@ -4,10 +4,12 @@ import { useState } from 'react';
 
 interface ScheduleFormFieldsProps {
   availablePatients: any[];
+  availableGroups: any[];
   templates: any[];
 }
 
-export default function ScheduleFormFields({ availablePatients, templates }: ScheduleFormFieldsProps) {
+export default function ScheduleFormFields({ availablePatients, availableGroups, templates }: ScheduleFormFieldsProps) {
+  const [targetType, setTargetType] = useState<'patient' | 'group'>('patient');
   const [isRandom, setIsRandom] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
@@ -20,14 +22,46 @@ export default function ScheduleFormFields({ availablePatients, templates }: Sch
       <input type="hidden" name="category" value={selectedCategory} />
 
       <div>
-        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Paciente</label>
-        <select name="patient_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
-          <option value="">Selecione...</option>
-          {availablePatients.map(p => (
-            <option key={p.id} value={p.id}>{p.name} {p.comorbidities?.length > 0 ? `(${p.comorbidities.join(', ')})` : ''}</option>
-          ))}
-        </select>
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Destinatário</label>
+        <div className="bg-slate-50 p-1 rounded-2xl flex border border-slate-200 mb-2">
+          <button 
+            type="button"
+            onClick={() => setTargetType('patient')}
+            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${targetType === 'patient' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
+          >
+            Paciente
+          </button>
+          <button 
+            type="button"
+            onClick={() => setTargetType('group')}
+            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${targetType === 'group' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
+          >
+            Grupo
+          </button>
+        </div>
       </div>
+
+      {targetType === 'patient' ? (
+        <div>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Paciente</label>
+          <select name="patient_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
+            <option value="">Selecione...</option>
+            {availablePatients.map(p => (
+              <option key={p.id} value={p.id}>{p.name} {p.comorbidities?.length > 0 ? `(${p.comorbidities.join(', ')})` : ''}</option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Grupo de Saúde</label>
+          <select name="group_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
+            <option value="">Selecione...</option>
+            {availableGroups.map(g => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mensagem Referência</label>

@@ -20,6 +20,12 @@ export default function PacientesPage() {
   const [selectedComorbidade, setSelectedComorbidade] = useState('all');
   const [semContatoPeriod, setSemContatoPeriod] = useState('30'); // '15', '30', '60', 'never'
 
+  // Estados para seleção em lote e grupos
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
+  const [groupsList, setGroupsList] = useState<any[]>([]);
+  const [selectedTargetGroupId, setSelectedTargetGroupId] = useState<string>('');
+  const [batchAdding, setBatchAdding] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       // Obter sessão e perfil do usuário
@@ -27,11 +33,23 @@ export default function PacientesPage() {
       if (session) {
         const { data: profile } = await supabase
           .from('acs')
-          .select('role')
+          .select('role, ubs_id')
           .eq('auth_user_id', session.user.id)
           .single();
         if (profile) {
           setUserRole(profile.role);
+          
+          // Buscar grupos da UBS do ACS logado
+          if (profile.ubs_id) {
+            const { data: groupsData } = await supabase
+              .from('patient_groups')
+              .select('id, name')
+              .eq('ubs_id', profile.ubs_id)
+              .order('name');
+            if (groupsData) {
+              setGroupsList(groupsData);
+            }
+          }
         }
       }
 
@@ -142,6 +160,30 @@ export default function PacientesPage() {
       return true;
     });
   }, [pacientes, searchTerm, selectedUbs, buscaAtivaEnabled, selectedComorbidade, semContatoPeriod]);
+
+  // Função para adicionar pacientes selecionados ao grupo em lote
+  const handleBatchAddToGroup = async () => {
+    if (!selectedTargetGroupId || selectedPatientIds.length === 0) return;
+    setBatchAdding(true);
+
+    try {
+      const { addMembersToGroupAction } = await import('../grupos/actions');
+      const result = await addMembersToGroupAction(selectedTargetGroupId, selectedPatientIds);
+
+      if (result.success) {
+        const groupName = groupsList.find(g => g.id === selectedTargetGroupId)?.name || 'grupo';
+        alert(`${result.count} paciente(s) adicionado(s) com sucesso ao grupo "${groupName}".`);
+        setSelectedPatientIds([]);
+        setSelectedTargetGroupId('');
+      } else {
+        alert(`Erro ao adicionar pacientes: ${result.error}`);
+      }
+    } catch (err: any) {
+      alert(`Ocorreu um erro: ${err.message}`);
+    } finally {
+      setBatchAdding(false);
+    }
+  };
 
   return (
     <div className="p-4 md:p-10 h-full overflow-auto">
@@ -267,11 +309,68 @@ export default function PacientesPage() {
         )}
       </div>
 
+      {/* Barra de Ações em Lote */}
+      {selectedPatientIds.length > 0 && (
+        <div className="mb-6 p-4 bg-teal-50 border border-teal-200 rounded-3xl flex flex-col sm:flex-row justify-between items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-2">
+            <span className="bg-teal-600 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-sm">
+              {selectedPatientIds.length}
+            </span>
+            <span className="text-sm font-bold text-teal-800">pacientes selecionados</span>
+          </div>
+          
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <select
+              value={selectedTargetGroupId}
+              onChange={(e) => setSelectedTargetGroupId(e.target.value)}
+              className="px-4 py-2.5 bg-white border border-teal-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 text-xs font-bold text-slate-700 w-full sm:w-56"
+            >
+              <option value="">Adicionar ao Grupo...</option>
+              {groupsList.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+            
+            <button
+              onClick={handleBatchAddToGroup}
+              disabled={!selectedTargetGroupId || batchAdding}
+              className="bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white text-xs font-black px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-1.5 uppercase tracking-wider flex-shrink-0"
+            >
+              {batchAdding ? 'Adicionando...' : 'Confirmar'}
+            </button>
+            
+            <button
+              onClick={() => {
+                setSelectedPatientIds([]);
+                setSelectedTargetGroupId('');
+              }}
+              className="text-xs text-slate-500 hover:text-slate-700 font-bold px-2 py-1.5"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 text-slate-500 text-xs uppercase tracking-widest border-b border-slate-100">
+                <th className="p-6 font-bold w-12">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                    checked={filteredPacientes.length > 0 && selectedPatientIds.length === filteredPacientes.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedPatientIds(filteredPacientes.map(p => p.id));
+                      } else {
+                        setSelectedPatientIds([]);
+                      }
+                    }}
+                  />
+                </th>
                 <th className="p-6 font-bold">Nome Completo</th>
                 <th className="p-6 font-bold">Comorbidades (e-SUS)</th>
                 <th className="p-6 font-bold">WhatsApp</th>
@@ -306,6 +405,20 @@ export default function PacientesPage() {
                     className="border-b border-slate-50 hover:bg-teal-50/30 transition-colors cursor-pointer"
                     onClick={() => router.push(`/dashboard/chat?patientId=${p.id}`)}
                   >
+                    <td className="p-6 w-12" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                        checked={selectedPatientIds.includes(p.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPatientIds(prev => [...prev, p.id]);
+                          } else {
+                            setSelectedPatientIds(prev => prev.filter(id => id !== p.id));
+                          }
+                        }}
+                      />
+                    </td>
                     <td className="p-6">
                       <div className="font-bold text-slate-700">{p.name}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-1 uppercase tracking-tight">{p.cns_masked || 'CNS não informado'}</div>

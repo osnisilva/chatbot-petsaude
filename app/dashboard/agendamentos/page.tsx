@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import PatientCard from './PatientCard';
 import { createScheduleAction } from './actions';
 import ScheduleFormFields from './ScheduleFormFields';
+import GroupCampaignsList from './GroupCampaignsList';
 
 export default async function AgendamentosPage() {
   const supabase = await createClient();
@@ -18,24 +19,30 @@ export default async function AgendamentosPage() {
 
   const isSecretaria = (acs?.ubs as any)?.name === 'Secretaria de Saúde';
 
-  // 2. Buscar Todos os Pacientes
+  // 2. Buscar Todos os Pacientes e Grupos
   let patientsQuery = supabase.from('patients').select('id, name, phone_number, comorbidities');
+  let groupsQuery = supabase.from('patient_groups').select('id, name');
   
   if (!isSecretaria && acs?.ubs_id) {
     patientsQuery = patientsQuery.eq('ubs_id', acs.ubs_id);
+    groupsQuery = groupsQuery.eq('ubs_id', acs.ubs_id);
   }
   
   const { data: allPatients } = await patientsQuery;
   const availablePatients = allPatients || [];
 
+  const { data: allGroups } = await groupsQuery;
+  const availableGroups = allGroups || [];
+
   // 3. Buscar Templates da Biblioteca
   const { data: templates } = await supabase.from('health_templates').select('id, title, category');
 
-  // 4. Buscar Agendamentos Ativos
+  // 4. Buscar Agendamentos Ativos (Individuais e de Grupo)
   let schedulesQuery = supabase.from('scheduled_messages')
     .select(`
-      id, patient_id, frequency, next_run_at, status, is_random, category,
+      id, patient_id, group_id, frequency, next_run_at, status, is_random, category,
       patient:patient_id(name, comorbidities, ubs:ubs_id(name)),
+      group:group_id(name),
       template:template_id(title, category)
     `)
     .order('next_run_at', { ascending: true });
@@ -46,8 +53,12 @@ export default async function AgendamentosPage() {
 
   const { data: schedules } = await schedulesQuery;
 
-  // 5. Agrupar Agendamentos por Paciente
-  const groupedSchedules = (schedules || []).reduce((acc: any, s: any) => {
+  // 5. Separar agendamentos individuais e de grupo
+  const individualSchedules = (schedules || []).filter(s => s.patient_id !== null);
+  const groupSchedules = (schedules || []).filter(s => s.group_id !== null);
+
+  // 6. Agrupar Agendamentos Individuais por Paciente
+  const groupedSchedules = individualSchedules.reduce((acc: any, s: any) => {
     const pId = s.patient_id;
     if (!acc[pId]) {
       acc[pId] = {
@@ -78,43 +89,54 @@ export default async function AgendamentosPage() {
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 sticky top-8">
             <h2 className="font-bold text-lg text-slate-800 mb-4">Nova Programação</h2>
             <form action={createScheduleAction} className="space-y-4">
-              <ScheduleFormFields availablePatients={availablePatients} templates={templates || []} />
+              <ScheduleFormFields 
+                availablePatients={availablePatients} 
+                availableGroups={availableGroups}
+                templates={templates || []} 
+              />
             </form>
           </div>
         </div>
 
-        {/* Lista de Cards Grouped by Patient */}
-        <div className="lg:col-span-3">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="font-bold text-xl text-slate-800">Pacientes em Acompanhamento</h2>
-            <span className="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-bold">
-              {patientIds.length} Pacientes Ativos
-            </span>
-          </div>
+        {/* Lista de Campanhas */}
+        <div className="lg:col-span-3 space-y-8">
+          
+          {/* Campanhas de Grupo */}
+          <GroupCampaignsList schedules={groupSchedules} />
 
-          {patientIds.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-200">
-              <div className="text-4xl mb-4">📅</div>
-              <p className="text-slate-500 font-medium">Nenhum paciente com trilha ativa no momento.</p>
+          {/* Pacientes Individuais */}
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="font-bold text-xl text-slate-800">Trilhas Individuais Ativas</h2>
+              <span className="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-bold">
+                {patientIds.length} Pacientes Ativos
+              </span>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {patientIds.map(pId => {
-                const group = groupedSchedules[pId];
-                return (
-                  <PatientCard 
-                    key={pId}
-                    patientId={pId}
-                    patientName={group.patientName}
-                    ubsName={group.ubsName}
-                    comorbidities={group.comorbidities}
-                    campaigns={group.campaigns}
-                    templates={templates || []}
-                  />
-                );
-              })}
-            </div>
-          )}
+
+            {patientIds.length === 0 ? (
+              <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-200">
+                <div className="text-4xl mb-4">📅</div>
+                <p className="text-slate-500 font-medium">Nenhum paciente com trilha individual ativa no momento.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {patientIds.map(pId => {
+                  const group = groupedSchedules[pId];
+                  return (
+                    <PatientCard 
+                      key={pId}
+                      patientId={pId}
+                      patientName={group.patientName}
+                      ubsName={group.ubsName}
+                      comorbidities={group.comorbidities}
+                      campaigns={group.campaigns}
+                      templates={templates || []}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

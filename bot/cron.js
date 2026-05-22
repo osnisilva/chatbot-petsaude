@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const cron = require('node-cron');
 const { getSafeRandomTemplate } = require('./ai_helper');
 
 // Configuração do Supabase (Service Role é necessário para burlar o RLS e ler todos os agendamentos)
@@ -29,6 +30,27 @@ function calculateNextRunAt(frequency) {
     return nextRun.toISOString();
 }
 
+// Função auxiliar para formatar e enviar mensagem de WhatsApp
+async function sendWhatsAppMessage(whatsappClient, patient, title, content) {
+    const phoneNumber = patient.phone_number;
+    let formattedNumber = phoneNumber;
+    
+    if (!formattedNumber.includes('@c.us')) {
+        // Remove caracteres especiais se houver
+        formattedNumber = formattedNumber.replace(/\D/g, '');
+        // Se faltar o código do país, adiciona o 55
+        if (formattedNumber.length <= 11) formattedNumber = `55${formattedNumber}`;
+        formattedNumber = `${formattedNumber}@c.us`;
+    }
+
+    // Preparando a mensagem com o título da campanha
+    const messageToSend = `🩺 *Mensagem da Equipe de Saúde*\n*Assunto:* ${title}\n\nOlá, ${patient.name.split(' ')[0]}!\n\n${content}\n\n_Esta é uma mensagem automática programada pelo seu Agente Comunitário de Saúde. Para parar de receber estes avisos, responda *SAIR*._`;
+
+    // Enviar via WhatsApp
+    await whatsappClient.sendMessage(formattedNumber, messageToSend);
+    console.log(`[CRON SUCESSO] Mensagem enviada para ${phoneNumber}`);
+}
+
 async function processScheduledMessages(whatsappClient) {
     const currentHour = new Date().getHours();
     
@@ -47,10 +69,11 @@ async function processScheduledMessages(whatsappClient) {
             frequency,
             next_run_at,
             patient_id,
+            group_id,
             template_id,
             is_random,
             category,
-            patients ( phone_number, name, comorbidities, lgpd_consent ),
+            patients ( id, phone_number, name, comorbidities, lgpd_consent ),
             health_templates ( title, category, content )
         `)
         .eq('status', 'active')
@@ -96,80 +119,159 @@ async function processScheduledMessages(whatsappClient) {
 
     for (const schedule of batch) {
         try {
-            if (schedule.patients.lgpd_consent === false) {
-                console.log(`[CRON INFO] Paciente ${schedule.patients.name} optou por sair (LGPD). Pulando envio.`);
-                continue;
-            }
-
-            const phoneNumber = schedule.patients.phone_number;
-            let content = '';
-            let title = '';
-
-            // LÓGICA DE SELEÇÃO DE CONTEÚDO (FIXO vs ALEATÓRIO)
-            if (schedule.is_random) {
-                console.log(`[CRON] Processando trilha aleatória (${schedule.category}) para ${schedule.patients.name}`);
+            if (schedule.group_id) {
+                console.log(`[CRON] Processando agendamento de GRUPO (ID: ${schedule.group_id})`);
                 
-                // 1. Buscar todos os templates da categoria
-                const { data: templates, error: tError } = await supabase
-                    .from('health_templates')
-                    .eq('category', schedule.category);
-
-                if (tError || !templates || templates.length === 0) {
-                    console.error(`[CRON ERRO] Nenhum template encontrado para categoria ${schedule.category}`);
+                // 1. Buscar membros do grupo
+                const { data: members, error: mError } = await supabase
+                    .from('patient_group_members')
+                    .select(`
+                        patients ( id, phone_number, name, comorbidities, lgpd_consent )
+                    `)
+                    .eq('group_id', schedule.group_id);
+                
+                if (mError) {
+                    console.error(`[CRON ERRO] Falha ao buscar membros do grupo ${schedule.group_id}:`, mError.message);
                     continue;
                 }
-
-                // 2. Pedir para a IA escolher um seguro
-                const safeTemplate = await getSafeRandomTemplate(schedule.patients, templates);
                 
-                if (!safeTemplate) {
-                    console.log(`[CRON INFO] IA não encontrou mensagem segura para ${schedule.patients.name}. Pulando este ciclo.`);
+                if (!members || members.length === 0) {
+                    console.log(`[CRON INFO] Grupo ${schedule.group_id} está vazio. Nenhuma mensagem a enviar.`);
+                    // Atualizar data de próxima execução para não travar
+                    const nextRun = calculateNextRunAt(schedule.frequency);
+                    await supabase
+                        .from('scheduled_messages')
+                        .update({ next_run_at: nextRun })
+                        .eq('id', schedule.id);
                     continue;
                 }
-
-                content = safeTemplate.content;
-                title = safeTemplate.title;
+                
+                console.log(`[CRON] Enviando mensagens para ${members.length} membros do grupo.`);
+                
+                // Buscar templates da categoria se for aleatório para reusar no grupo (otimização)
+                let categoryTemplates = [];
+                if (schedule.is_random) {
+                    const { data: templates, error: tError } = await supabase
+                        .from('health_templates')
+                        .eq('category', schedule.category);
+                    
+                    if (tError || !templates || templates.length === 0) {
+                        console.error(`[CRON ERRO] Nenhum template encontrado para categoria ${schedule.category}`);
+                        // Atualizar data para evitar travamento
+                        const nextRun = calculateNextRunAt(schedule.frequency);
+                        await supabase
+                            .from('scheduled_messages')
+                            .update({ next_run_at: nextRun })
+                            .eq('id', schedule.id);
+                        continue;
+                    }
+                    categoryTemplates = templates;
+                }
+                
+                for (const member of members) {
+                    const patient = member.patients;
+                    if (!patient) continue;
+                    
+                    if (patient.lgpd_consent === false) {
+                        console.log(`[CRON INFO] Paciente ${patient.name} optou por sair (LGPD). Pulando envio.`);
+                        continue;
+                    }
+                    
+                    let content = '';
+                    let title = '';
+                    
+                    if (schedule.is_random) {
+                        // Escolha do template customizado para cada paciente via IA
+                        const safeTemplate = await getSafeRandomTemplate(patient, categoryTemplates);
+                        if (!safeTemplate) {
+                            console.log(`[CRON INFO] IA não encontrou mensagem segura para ${patient.name}. Pulando este paciente.`);
+                            continue;
+                        }
+                        content = safeTemplate.content;
+                        title = safeTemplate.title;
+                    } else {
+                        if (!schedule.health_templates) {
+                            console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template vinculado.`);
+                            continue;
+                        }
+                        content = schedule.health_templates.content;
+                        title = schedule.health_templates.title;
+                    }
+                    
+                    await sendWhatsAppMessage(whatsappClient, patient, title, content);
+                    
+                    // Pausa de segurança anti-spam (5 a 10 segundos entre cada envio do grupo)
+                    const pause = Math.floor(Math.random() * (10000 - 5000 + 1) + 5000);
+                    await new Promise(r => setTimeout(r, pause));
+                }
+                
+                // Calcular próxima data e atualizar o agendamento do grupo
+                const nextRun = calculateNextRunAt(schedule.frequency);
+                await supabase
+                    .from('scheduled_messages')
+                    .update({ next_run_at: nextRun })
+                    .eq('id', schedule.id);
+                
+                console.log(`[CRON SUCESSO] Agendamento de grupo ${schedule.id} processado com sucesso.`);
+                
             } else {
-                // Mensagem Fixa (Padrão atual)
-                if (!schedule.health_templates) {
-                    console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template vinculado.`);
+                // Lógica de paciente individual (id do paciente deve estar presente)
+                if (!schedule.patients) {
+                    console.error(`[CRON ERRO] Agendamento individual ${schedule.id} sem paciente vinculado.`);
                     continue;
                 }
-                content = schedule.health_templates.content;
-                title = schedule.health_templates.title;
+                
+                const patient = schedule.patients;
+                
+                if (patient.lgpd_consent === false) {
+                    console.log(`[CRON INFO] Paciente ${patient.name} optou por sair (LGPD). Pulando envio.`);
+                    continue;
+                }
+                
+                let content = '';
+                let title = '';
+                
+                if (schedule.is_random) {
+                    console.log(`[CRON] Processando trilha aleatória (${schedule.category}) para ${patient.name}`);
+                    const { data: templates, error: tError } = await supabase
+                        .from('health_templates')
+                        .eq('category', schedule.category);
+                    
+                    if (tError || !templates || templates.length === 0) {
+                        console.error(`[CRON ERRO] Nenhum template encontrado para categoria ${schedule.category}`);
+                        continue;
+                    }
+                    
+                    const safeTemplate = await getSafeRandomTemplate(patient, templates);
+                    if (!safeTemplate) {
+                        console.log(`[CRON INFO] IA não encontrou mensagem segura para ${patient.name}. Pulando este ciclo.`);
+                        continue;
+                    }
+                    content = safeTemplate.content;
+                    title = safeTemplate.title;
+                } else {
+                    if (!schedule.health_templates) {
+                        console.error(`[CRON ERRO] Agendamento fixo ${schedule.id} sem template vinculado.`);
+                        continue;
+                    }
+                    content = schedule.health_templates.content;
+                    title = schedule.health_templates.title;
+                }
+                
+                await sendWhatsAppMessage(whatsappClient, patient, title, content);
+                
+                // Pausa de segurança anti-spam (5 a 10 segundos)
+                const pause = Math.floor(Math.random() * (10000 - 5000 + 1) + 5000);
+                await new Promise(r => setTimeout(r, pause));
+                
+                const nextRun = calculateNextRunAt(schedule.frequency);
+                await supabase
+                    .from('scheduled_messages')
+                    .update({ next_run_at: nextRun })
+                    .eq('id', schedule.id);
+                
+                console.log(`[CRON SUCESSO] Agendamento individual ${schedule.id} processado com sucesso.`);
             }
-            
-            // Formatando o número para o padrão do WhatsApp Web JS (DDD + Numero + @c.us)
-            // Assumindo que o phone_number já está salvo corretamente ou precisa de ajuste
-            let formattedNumber = phoneNumber;
-            if (!formattedNumber.includes('@c.us')) {
-                // Remove caracteres especiais se houver
-                formattedNumber = formattedNumber.replace(/\D/g, '');
-                // Se faltar o código do país, adiciona o 55
-                if (formattedNumber.length <= 11) formattedNumber = `55${formattedNumber}`;
-                formattedNumber = `${formattedNumber}@c.us`;
-            }
-
-            // Preparando a mensagem com o título da campanha
-            const messageToSend = `🩺 *Mensagem da Equipe de Saúde*\n*Assunto:* ${title}\n\nOlá, ${schedule.patients.name.split(' ')[0]}!\n\n${content}\n\n_Esta é uma mensagem automática programada pelo seu Agente Comunitário de Saúde. Para parar de receber estes avisos, responda *SAIR*._`;
-
-            // Enviar via WhatsApp
-            await whatsappClient.sendMessage(formattedNumber, messageToSend);
-            console.log(`[CRON SUCESSO] Mensagem enviada para ${phoneNumber}`);
-
-            // Pausa de segurança anti-spam (5 a 10 segundos entre cada envio)
-            const pause = Math.floor(Math.random() * (10000 - 5000 + 1) + 5000);
-            await new Promise(r => setTimeout(r, pause));
-
-            // Calcular próxima data (usa o horário atual por padrão dentro da função)
-            const nextRun = calculateNextRunAt(schedule.frequency);
-
-            // Atualizar banco
-            await supabase
-                .from('scheduled_messages')
-                .update({ next_run_at: nextRun })
-                .eq('id', schedule.id);
-
         } catch (err) {
             console.error(`[CRON ERRO] Falha ao processar agendamento ${schedule.id}:`, err.message);
         }

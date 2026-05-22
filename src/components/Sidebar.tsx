@@ -68,8 +68,11 @@ export default function Sidebar({ userName, unitName, userRole, userEmail, isOpe
           <SidebarLink href="/dashboard" active={pathname === '/dashboard'}>
             Visão Geral
           </SidebarLink>
-          <SidebarLink href="/dashboard/pacientes" active={pathname.startsWith('/dashboard/pacientes')}>
+          <SidebarLink href="/dashboard/pacientes" active={pathname.startsWith('/dashboard/pacientes') && !pathname.startsWith('/dashboard/pacientes/grupos')}>
             Pacientes
+          </SidebarLink>
+          <SidebarLink href="/dashboard/grupos" active={pathname.startsWith('/dashboard/grupos')}>
+            Grupos de Saúde
           </SidebarLink>
           <SidebarLink href="/dashboard/chat" active={pathname.startsWith('/dashboard/chat')}>
             <div className="flex items-center justify-between w-full">

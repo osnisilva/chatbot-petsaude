@@ -12,7 +12,8 @@ export async function createScheduleAction(formData: FormData) {
     const acsProfile = await supabase.from('acs').select('id').eq('auth_user_id', user.id).single();
     if (!acsProfile.data) throw new Error("Perfil ACS não encontrado");
 
-    const patient_id = formData.get('patient_id');
+    const patient_id = formData.get('patient_id') || null;
+    const group_id = formData.get('group_id') || null;
     const template_id = formData.get('template_id') || null;
     const is_random = formData.get('is_random') === 'true';
     const category = formData.get('category');
@@ -21,7 +22,8 @@ export async function createScheduleAction(formData: FormData) {
 
     const { error } = await supabase.from('scheduled_messages').insert({
       acs_id: acsProfile.data.id,
-      patient_id,
+      patient_id: patient_id || null,
+      group_id: group_id || null,
       template_id: is_random ? null : template_id,
       is_random,
       category: is_random ? category : null,
