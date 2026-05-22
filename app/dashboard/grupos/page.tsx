@@ -316,7 +316,7 @@ export default function GruposPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Painel Esquerdo (Largo, 2/3): Membros do Grupo Selecionado ("os grupos") */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 order-2">
           {selectedGroup ? (
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 h-full flex flex-col min-h-[500px]">
               
@@ -477,14 +477,14 @@ export default function GruposPage() {
               </div>
               <h2 className="text-xl font-bold text-slate-800">Selecione um Grupo</h2>
               <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-                Selecione um grupo de saúde da lista à direita para visualizar os pacientes vinculados, remover membros ou gerenciar as campanhas.
+                Selecione um grupo de saúde da lista à esquerda para visualizar os pacientes vinculados, remover membros ou gerenciar as campanhas.
               </p>
             </div>
           )}
         </div>
 
         {/* Painel Direito (Estreito, 1/3): Criação e Seleção de Grupos da Unidade */}
-        <div className="lg:col-span-1 space-y-8">
+        <div className="lg:col-span-1 space-y-8 order-1">
           
           {/* Formulário de Criação (Apenas para Gerentes/Admin) */}
           {isManagerOrAdmin ? (

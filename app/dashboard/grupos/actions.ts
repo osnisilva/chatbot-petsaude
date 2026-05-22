@@ -234,16 +234,35 @@ export async function importPatientsByComorbidityAction(groupId: string, comorbi
       return { success: true, count: 0 };
     }
 
-    // 3. Montar a lista de inserts para patient_group_members
-    const inserts = matchedPatients.map((p: any) => ({
+    // 3. Buscar membros atuais do grupo para evitar inserções desnecessárias ou conflitos
+    const { data: currentMembers, error: membersError } = await supabase
+      .from('patient_group_members')
+      .select('patient_id')
+      .eq('group_id', groupId);
+
+    if (membersError) {
+      throw new Error(`Erro ao verificar membros atuais: ${membersError.message}`);
+    }
+
+    const currentMemberIds = new Set((currentMembers || []).map((m: any) => m.patient_id));
+
+    // 4. Filtrar correspondências para manter apenas quem ainda NÃO está no grupo
+    const newPatientsToInsert = matchedPatients.filter((p: any) => !currentMemberIds.has(p.id));
+
+    if (newPatientsToInsert.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // 5. Montar a lista de inserts para patient_group_members
+    const inserts = newPatientsToInsert.map((p: any) => ({
       group_id: groupId,
       patient_id: p.id
     }));
 
-    // 4. Inserir em lote usando upsert e ignorando duplicados
+    // 6. Inserir em lote na tabela
     const { error: insertError } = await supabase
       .from('patient_group_members')
-      .upsert(inserts, { onConflict: 'group_id,patient_id', ignoreDuplicates: true });
+      .insert(inserts);
 
     if (insertError) {
       throw insertError;
@@ -253,7 +272,7 @@ export async function importPatientsByComorbidityAction(groupId: string, comorbi
     revalidatePath('/dashboard/grupos');
     revalidatePath('/dashboard/pacientes');
 
-    return { success: true, count: patients.length };
+    return { success: true, count: newPatientsToInsert.length };
   } catch (err: any) {
     console.error('Erro ao importar pacientes por comorbidade:', err.message);
     return { success: false, error: err.message };
