@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Users, Plus, Trash2, UserMinus, Search, AlertCircle, Calendar, UserPlus, Download } from 'lucide-react';
+import { Users, Plus, Trash2, UserMinus, Search, AlertCircle, Calendar, UserPlus, Download, Edit2 } from 'lucide-react';
 import { createGroupAction, editGroupAction, deleteGroupAction, removeMemberFromGroupAction, addMembersToGroupAction, importPatientsByComorbidityAction } from './actions';
 
 export default function GruposPage() {
@@ -377,8 +377,9 @@ export default function GruposPage() {
                   {isManagerOrAdmin && (
                     <button
                       onClick={handleStartEdit}
-                      className="mt-3 text-xs font-bold text-teal-600 hover:text-teal-700 underline"
+                      className="mt-4 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-4 rounded-xl flex items-center gap-1.5 transition-all shadow-sm w-fit"
                     >
+                      <Edit2 className="h-3.5 w-3.5" />
                       Editar Informações do Grupo
                     </button>
                   )}

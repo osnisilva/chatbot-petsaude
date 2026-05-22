@@ -1,6 +1,8 @@
 "use client";
 
-import { deleteScheduleAction } from './actions';
+import { useState } from 'react';
+import { deleteScheduleAction, editScheduleDateAction } from './actions';
+import { Edit2, Trash2, Check, X } from 'lucide-react';
 
 interface GroupCampaignsListProps {
   schedules: any[];
@@ -8,6 +10,9 @@ interface GroupCampaignsListProps {
 }
 
 export default function GroupCampaignsList({ schedules, isManager }: GroupCampaignsListProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
   
   const handleCancelGroupSchedule = async (scheduleId: string, groupName: string) => {
     if (confirm(`Deseja cancelar esta campanha do grupo "${groupName}"?`)) {
@@ -15,6 +20,32 @@ export default function GroupCampaignsList({ schedules, isManager }: GroupCampai
       if (!result.success) {
         alert(`Erro ao cancelar agendamento: ${result.error}`);
       }
+    }
+  };
+
+  const handleStartEdit = (schedule: any) => {
+    setEditingId(schedule.id);
+    // Para preencher o input datetime-local com a data atual formatada: YYYY-MM-DDTHH:mm
+    // O next_run_at já está em UTC. Precisamos formatar em tempo local para o input
+    const d = new Date(schedule.next_run_at);
+    // Cria string YYYY-MM-DDTHH:mm usando métodos get locais
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    setEditDate(`${year}-${month}-${day}T${hours}:${minutes}`);
+  };
+
+  const handleSaveEdit = async (scheduleId: string) => {
+    if (!editDate) return;
+    setIsSaving(true);
+    const result = await editScheduleDateAction(scheduleId, editDate);
+    setIsSaving(false);
+    if (result.success) {
+      setEditingId(null);
+    } else {
+      alert(`Erro ao editar agendamento: ${result.error}`);
     }
   };
 
@@ -54,13 +85,22 @@ export default function GroupCampaignsList({ schedules, isManager }: GroupCampai
                       </span>
                     )}
                     {isManager && (
-                      <button
-                        onClick={() => handleCancelGroupSchedule(camp.id, groupName)}
-                        className="text-slate-300 hover:text-rose-500 transition-colors p-1 hover:bg-rose-50 rounded-lg"
-                        title="Cancelar campanha"
-                      >
-                        🗑️
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStartEdit(camp)}
+                          className="text-slate-300 hover:text-indigo-500 transition-colors p-1.5 hover:bg-indigo-50 rounded-lg"
+                          title="Editar data/hora"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleCancelGroupSchedule(camp.id, groupName)}
+                          className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 hover:bg-rose-50 rounded-lg"
+                          title="Cancelar campanha"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -80,12 +120,38 @@ export default function GroupCampaignsList({ schedules, isManager }: GroupCampai
                       <span>Frequência:</span>
                       <span className="font-bold capitalize">{camp.frequency}</span>
                     </p>
-                    <p className="flex items-center gap-1.5">
+                    <div className="flex items-start gap-1.5">
                       <span>Próximo envio:</span>
-                      <span className="font-bold text-slate-800">
-                        {new Date(camp.next_run_at).toLocaleDateString('pt-BR')} às {new Date(camp.next_run_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </p>
+                      {editingId === camp.id ? (
+                        <div className="flex flex-col gap-2 w-full mt-1">
+                          <input 
+                            type="datetime-local" 
+                            value={editDate}
+                            onChange={(e) => setEditDate(e.target.value)}
+                            className="w-full text-xs p-1.5 border border-indigo-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                          <div className="flex gap-1 justify-end">
+                            <button 
+                              onClick={() => setEditingId(null)}
+                              className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button 
+                              onClick={() => handleSaveEdit(camp.id)}
+                              disabled={isSaving}
+                              className="px-2 py-1 text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 rounded-md transition-colors flex items-center gap-1"
+                            >
+                              {isSaving ? 'Salvando...' : 'Salvar'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-slate-800">
+                          {new Date(camp.next_run_at).toLocaleDateString('pt-BR')} às {new Date(camp.next_run_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="mt-3 p-3 bg-white rounded-lg border border-slate-100 shadow-sm relative overflow-hidden">

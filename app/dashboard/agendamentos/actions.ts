@@ -154,3 +154,43 @@ export async function deleteAllSchedulesForPatientAction(patientId: string) {
     return { success: false, error: err.message };
   }
 }
+
+export async function editScheduleDateAction(scheduleId: string, next_run_at_input: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
+    const acsProfile = await supabase.from('acs').select('id, role').eq('auth_user_id', user.id).single();
+    if (!acsProfile.data) throw new Error("Perfil ACS não encontrado");
+
+    if (!next_run_at_input) {
+      throw new Error("Data inválida.");
+    }
+
+    // Tratamento de fuso horário (-03:00) como na criação
+    let next_run_at = new Date().toISOString();
+    let tzString = next_run_at_input;
+    if (!tzString.includes('Z') && !tzString.match(/[+-]\d{2}:\d{2}$/)) {
+      tzString += '-03:00';
+    }
+    next_run_at = new Date(tzString).toISOString();
+
+    const schedule = await supabase.from('scheduled_messages').select('group_id').eq('id', scheduleId).single();
+    if (schedule.data?.group_id && acsProfile.data.role !== 'gerente' && acsProfile.data.role !== 'admin_ti') {
+      throw new Error("Apenas gerentes podem editar campanhas de grupo.");
+    }
+
+    const { error } = await supabase
+      .from('scheduled_messages')
+      .update({ next_run_at })
+      .eq('id', scheduleId);
+
+    if (error) throw error;
+    revalidatePath('/dashboard/agendamentos');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Erro ao editar agendamento:', err.message);
+    return { success: false, error: err.message };
+  }
+}
