@@ -39,11 +39,16 @@ export async function createScheduleAction(formData: FormData) {
       if (!next_run_at_input) {
         throw new Error("A data e o horário do envio são obrigatórios para campanhas de grupo.");
       }
-      const d = new Date(next_run_at_input);
-      if (d.getDay() === 0) {
+      const datePart = next_run_at_input.split('T')[0];
+      const timePart = next_run_at_input.split('T')[1];
+      const hour = parseInt(timePart.split(':')[0], 10);
+
+      // Usar a data em UTC para não sofrer variação na hora de pegar o dia da semana
+      const dUtc = new Date(`${datePart}T00:00:00Z`);
+      if (dUtc.getUTCDay() === 0) {
         throw new Error("Não é permitido agendar campanhas de grupo aos domingos.");
       }
-      const hour = d.getHours();
+      
       if (hour < 8 || hour >= 18) {
         throw new Error("O horário de agendamento deve estar entre 08:00 e 17:59.");
       }
@@ -63,7 +68,15 @@ export async function createScheduleAction(formData: FormData) {
       final_custom_content = groupData.campaign_content || '';
     }
 
-    const next_run_at = next_run_at_input ? new Date(next_run_at_input).toISOString() : new Date().toISOString();
+    let next_run_at = new Date().toISOString();
+    if (next_run_at_input) {
+      let tzString = next_run_at_input;
+      // Se não houver indicador de timezone, assumimos o fuso do Brasil (UTC-3)
+      if (!tzString.includes('Z') && !tzString.match(/[+-]\d{2}:\d{2}$/)) {
+        tzString += '-03:00';
+      }
+      next_run_at = new Date(tzString).toISOString();
+    }
 
     const insertData: any = {
       acs_id: acsProfile.data.id,
