@@ -154,18 +154,7 @@ export default function AddTrailModal({ patientId, patientName, templates, onClo
             </div>
           )}
 
-          {/* Programar Data e Hora do Envio */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-              Data e Hora do Envio (Opcional)
-            </label>
-            <input 
-              type="datetime-local" 
-              name="next_run_at" 
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium" 
-            />
-            <p className="text-[10px] text-slate-400 mt-1">Deixe em branco para disparar imediatamente.</p>
-          </div>
+
 
           {/* Frequência */}
           <div>
