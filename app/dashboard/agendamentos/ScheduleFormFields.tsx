@@ -1,19 +1,30 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface ScheduleFormFieldsProps {
   availablePatients: any[];
   availableGroups: any[];
   templates: any[];
+  tab: string; // 'individual' | 'grupo'
 }
 
-export default function ScheduleFormFields({ availablePatients, availableGroups, templates }: ScheduleFormFieldsProps) {
-  const [targetType, setTargetType] = useState<'patient' | 'group'>('patient');
+export default function ScheduleFormFields({ availablePatients, availableGroups, templates, tab }: ScheduleFormFieldsProps) {
   const [messageType, setMessageType] = useState<'template' | 'random' | 'custom'>('template');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('enfermagem');
-  const [frequency, setFrequency] = useState('unica');
+  const [frequency, setFrequency] = useState('semanal');
+
+  // Sincroniza os estados ao alternar as abas
+  useEffect(() => {
+    if (tab === 'individual') {
+      setMessageType('template');
+      setFrequency('semanal');
+    } else {
+      setMessageType('custom');
+      setFrequency('unica');
+    }
+  }, [tab]);
 
   // Encontra a categoria do template selecionado se for do tipo template
   const templateCategory = templates.find(t => t.id === selectedTemplateId)?.category || '';
@@ -26,7 +37,6 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
     { value: 'lembrete_medicamento', label: 'Lembrete de Medicamento' }
   ];
 
-  // Quando muda o tipo de mensagem, ajusta a frequência recomendada
   const handleMessageTypeChange = (type: 'template' | 'random' | 'custom') => {
     setMessageType(type);
     if (type === 'custom') {
@@ -41,29 +51,8 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
       <input type="hidden" name="message_type" value={messageType} />
       <input type="hidden" name="category" value={messageType === 'random' ? selectedCategory : templateCategory} />
 
-      {/* Target Type: Paciente ou Grupo */}
-      <div>
-        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Destinatário</label>
-        <div className="bg-slate-50 p-1 rounded-2xl flex border border-slate-200 mb-2">
-          <button 
-            type="button"
-            onClick={() => setTargetType('patient')}
-            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${targetType === 'patient' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
-          >
-            Paciente
-          </button>
-          <button 
-            type="button"
-            onClick={() => setTargetType('group')}
-            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${targetType === 'group' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
-          >
-            Grupo
-          </button>
-        </div>
-      </div>
-
-      {/* Seleção do Destinatário */}
-      {targetType === 'patient' ? (
+      {/* Seleção do Destinatário (Paciente ou Grupo dependendo da Aba) */}
+      {tab === 'individual' ? (
         <div>
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Paciente</label>
           <select name="patient_id" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium">
@@ -85,7 +74,7 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
         </div>
       )}
 
-      {/* Tipo de Mensagem */}
+      {/* Tipo de Conteúdo de Mensagem */}
       <div>
         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Conteúdo da Mensagem</label>
         <div className="bg-slate-50 p-1 rounded-2xl flex border border-slate-200 mb-2">
@@ -103,13 +92,15 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
           >
             Inteligente
           </button>
-          <button 
-            type="button"
-            onClick={() => handleMessageTypeChange('custom')}
-            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${messageType === 'custom' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
-          >
-            Personalizada
-          </button>
+          {tab === 'grupo' && (
+            <button 
+              type="button"
+              onClick={() => handleMessageTypeChange('custom')}
+              className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all ${messageType === 'custom' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
+            >
+              Personalizada
+            </button>
+          )}
         </div>
       </div>
 
@@ -154,7 +145,7 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
         </div>
       )}
 
-      {messageType === 'custom' && (
+      {messageType === 'custom' && tab === 'grupo' && (
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Assunto da Campanha</label>
@@ -202,7 +193,9 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
           onChange={(e) => setFrequency(e.target.value)}
           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium"
         >
-          <option value="unica">Envio Único (Disparo Pontual)</option>
+          {tab === 'grupo' && (
+            <option value="unica">Envio Único (Disparo Pontual)</option>
+          )}
           <option value="diario">Diário</option>
           <option value="semanal">Semanal</option>
           <option value="quinzenal">Quinzenal</option>
@@ -212,11 +205,15 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
 
       <button 
         type="submit" 
-        disabled={availablePatients.length === 0 && targetType === 'patient'}
+        disabled={
+          (tab === 'individual' && availablePatients.length === 0) ||
+          (tab === 'grupo' && availableGroups.length === 0)
+        }
         className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-2xl shadow-sm transition-colors mt-2"
       >
-        Ativar Campanha / Trilha
+        {tab === 'individual' ? 'Ativar Trilha de Cuidado' : 'Agendar / Disparar Campanha'}
       </button>
     </div>
   );
 }
+

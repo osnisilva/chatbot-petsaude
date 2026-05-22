@@ -3,8 +3,16 @@ import PatientCard from './PatientCard';
 import { createScheduleAction } from './actions';
 import ScheduleFormFields from './ScheduleFormFields';
 import GroupCampaignsList from './GroupCampaignsList';
+import Link from 'next/link';
 
-export default async function AgendamentosPage() {
+interface PageProps {
+  searchParams: Promise<{ tab?: string }> | { tab?: string };
+}
+
+export default async function AgendamentosPage({ searchParams }: PageProps) {
+  const resolvedParams = searchParams instanceof Promise ? await searchParams : searchParams;
+  const tab = resolvedParams?.tab || 'individual';
+
   const supabase = await createClient();
   const { data: { user: session } } = await supabase.auth.getUser();
   
@@ -76,23 +84,54 @@ export default async function AgendamentosPage() {
 
   return (
     <div className="p-8 h-full overflow-y-auto bg-slate-50/50">
-      <div className="flex justify-between items-end mb-8">
+      <div className="flex justify-between items-end mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Trilhas de Cuidado</h1>
-          <p className="text-slate-500 mt-2">Gerencie as campanhas ativas e programe novos lembretes.</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Agendamentos e Campanhas</h1>
+          <p className="text-slate-500 mt-2">Envie orientações de saúde personalizadas ou gerencie disparos coletivos da UBS.</p>
         </div>
+      </div>
+
+      {/* Abas de Navegação */}
+      <div className="flex border-b border-slate-200 mb-8" role="tablist" aria-label="Opções de Agendamento">
+        <Link 
+          href="/dashboard/agendamentos?tab=individual"
+          role="tab"
+          aria-selected={tab === 'individual'}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${
+            tab === 'individual' 
+              ? 'border-emerald-600 text-emerald-600' 
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          👤 Acompanhamento Individual (Trilhas)
+        </Link>
+        <Link 
+          href="/dashboard/agendamentos?tab=grupo"
+          role="tab"
+          aria-selected={tab === 'grupo'}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${
+            tab === 'grupo' 
+              ? 'border-emerald-600 text-emerald-600' 
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          👥 Campanhas de Grupo (Lote)
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Formulário de Criação (Lateral) */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 sticky top-8">
-            <h2 className="font-bold text-lg text-slate-800 mb-4">Nova Programação</h2>
+            <h2 className="font-bold text-lg text-slate-800 mb-4">
+              {tab === 'individual' ? 'Nova Trilha Individual' : 'Nova Campanha de Grupo'}
+            </h2>
             <form action={createScheduleAction} className="space-y-4">
               <ScheduleFormFields 
                 availablePatients={availablePatients} 
                 availableGroups={availableGroups}
                 templates={templates || []} 
+                tab={tab}
               />
             </form>
           </div>
@@ -101,42 +140,44 @@ export default async function AgendamentosPage() {
         {/* Lista de Campanhas */}
         <div className="lg:col-span-3 space-y-8">
           
-          {/* Campanhas de Grupo */}
-          <GroupCampaignsList schedules={groupSchedules} />
+          {tab === 'grupo' ? (
+            /* Campanhas de Grupo */
+            <GroupCampaignsList schedules={groupSchedules} />
+          ) : (
+            /* Pacientes Individuais */
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="font-bold text-xl text-slate-800">Trilhas Individuais Ativas</h2>
+                <span className="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-bold">
+                  {patientIds.length} Pacientes Ativos
+                </span>
+              </div>
 
-          {/* Pacientes Individuais */}
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="font-bold text-xl text-slate-800">Trilhas Individuais Ativas</h2>
-              <span className="bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-bold">
-                {patientIds.length} Pacientes Ativos
-              </span>
+              {patientIds.length === 0 ? (
+                <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-200">
+                  <div className="text-4xl mb-4">📅</div>
+                  <p className="text-slate-500 font-medium">Nenhum paciente com trilha individual ativa no momento.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {patientIds.map(pId => {
+                    const group = groupedSchedules[pId];
+                    return (
+                      <PatientCard 
+                        key={pId}
+                        patientId={pId}
+                        patientName={group.patientName}
+                        ubsName={group.ubsName}
+                        comorbidities={group.comorbidities}
+                        campaigns={group.campaigns}
+                        templates={templates || []}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
-
-            {patientIds.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-slate-200">
-                <div className="text-4xl mb-4">📅</div>
-                <p className="text-slate-500 font-medium">Nenhum paciente com trilha individual ativa no momento.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {patientIds.map(pId => {
-                  const group = groupedSchedules[pId];
-                  return (
-                    <PatientCard 
-                      key={pId}
-                      patientId={pId}
-                      patientName={group.patientName}
-                      ubsName={group.ubsName}
-                      comorbidities={group.comorbidities}
-                      campaigns={group.campaigns}
-                      templates={templates || []}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
