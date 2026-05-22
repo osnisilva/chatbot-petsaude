@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { createScheduleAction } from './actions';
 
 interface ScheduleFormFieldsProps {
   availablePatients: any[];
@@ -10,6 +11,7 @@ interface ScheduleFormFieldsProps {
 }
 
 export default function ScheduleFormFields({ availablePatients, availableGroups, templates, tab }: ScheduleFormFieldsProps) {
+  const [loading, setLoading] = useState(false);
   const [messageType, setMessageType] = useState<'template' | 'random' | 'custom'>('template');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('enfermagem');
@@ -46,8 +48,22 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    const formData = new FormData(e.currentTarget);
+    const result = await createScheduleAction(formData);
+    setLoading(false);
+    
+    if (result.success) {
+      alert("Agendamento criado com sucesso!");
+    } else {
+      alert("Atenção: " + result.error);
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <input type="hidden" name="message_type" value={messageType} />
       <input type="hidden" name="category" value={messageType === 'random' ? selectedCategory : templateCategory} />
 
@@ -185,14 +201,14 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
           {/* Programar Data e Hora do Envio (Apenas para Grupo) */}
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-              Data e Hora do Envio (Opcional)
+              Data e Hora do Envio
             </label>
             <input 
               type="datetime-local" 
               name="next_run_at" 
+              required
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium" 
             />
-            <p className="text-[10px] text-slate-400 mt-1">Deixe em branco para disparar imediatamente.</p>
           </div>
 
           {/* Força Envio Único oculto para Grupo */}
@@ -203,14 +219,15 @@ export default function ScheduleFormFields({ availablePatients, availableGroups,
       <button 
         type="submit" 
         disabled={
+          loading ||
           (tab === 'individual' && availablePatients.length === 0) ||
           (tab === 'grupo' && availableGroups.length === 0)
         }
         className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-2xl shadow-sm transition-colors mt-2"
       >
-        {tab === 'individual' ? 'Ativar Trilha de Cuidado' : 'Agendar / Disparar Campanha'}
+        {loading ? 'Aguarde...' : (tab === 'individual' ? 'Ativar Trilha de Cuidado' : 'Agendar / Disparar Campanha')}
       </button>
-    </div>
+    </form>
   );
 }
 

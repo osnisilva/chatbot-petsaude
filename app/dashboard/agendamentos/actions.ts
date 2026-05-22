@@ -25,6 +25,9 @@ export async function createScheduleAction(formData: FormData) {
     
     // Captura da data programada
     const next_run_at_input = formData.get('next_run_at') as string;
+    if (group_id && !next_run_at_input) {
+      throw new Error("A data e o horário do envio são obrigatórios para campanhas de grupo.");
+    }
     const next_run_at = next_run_at_input ? new Date(next_run_at_input).toISOString() : new Date().toISOString();
 
     const is_random = message_type === 'random';

@@ -126,14 +126,12 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
             <h2 className="font-bold text-lg text-slate-800 mb-4">
               {tab === 'individual' ? 'Nova Trilha Individual' : 'Nova Campanha de Grupo'}
             </h2>
-            <form action={createScheduleAction} className="space-y-4">
               <ScheduleFormFields 
                 availablePatients={availablePatients} 
                 availableGroups={availableGroups}
                 templates={templates || []} 
                 tab={tab}
               />
-            </form>
           </div>
         </div>
 
