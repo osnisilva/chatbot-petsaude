@@ -57,7 +57,8 @@ export default async function AgendamentosPage({ searchParams }: PageProps) {
     .order('next_run_at', { ascending: true });
 
   if (!isSecretaria && acs?.id) {
-    schedulesQuery = schedulesQuery.eq('acs_id', acs.id);
+    // Retorna campanhas criadas pelo ACS logado OU campanhas de grupo (a RLS garante que são apenas da mesma UBS)
+    schedulesQuery = schedulesQuery.or(`acs_id.eq.${acs.id},group_id.not.is.null`);
   }
 
   const { data: schedules } = await schedulesQuery;
